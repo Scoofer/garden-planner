@@ -161,6 +161,7 @@ select, input, textarea {
 .badge.thirsty { background: var(--thirsty-bg); color: var(--thirsty); }
 .badge.soon { background: #fff3e0; color: var(--amber); }
 .badge.custom-badge { background: #eef; color: #4a4aa0; }
+.field-hint { display: block; font-weight: 400; font-size: 0.78rem; color: var(--muted); margin-top: 0.2rem; }
 .guide-card.custom-card { border-left: 3px solid #8f8fd6; }
 
 .meta { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; }

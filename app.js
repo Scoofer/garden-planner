@@ -57,7 +57,11 @@
     interval: document.getElementById("interval"),
     sun: document.getElementById("sun"),
     notes: document.getElementById("notes"),
+    placeBed: document.getElementById("placeBed"),
   };
+  const placeBedRow = document.getElementById("placeBedRow");
+  // Metadata for the plant currently in the dialog, used to place it in a bed.
+  let dialogMeta = null;
 
   // --- Persistence ---
   function load() {
@@ -227,11 +231,16 @@
       f.interval.value = plant.interval || "";
       f.sun.value = plant.sun || "";
       f.notes.value = plant.notes || "";
+      dialogMeta = { guideId: plant.guideId || null, spacingIn: plant.spacingIn || null };
+      const cur = plantingBed(plant);
+      fillBedPicker(cur ? cur.id : (plant.bedId || ""));
     } else {
       dialogTitle.textContent = "Add plant";
       f.id.value = "";
       f.planted.value = todayStr();
       f.interval.value = 3;
+      dialogMeta = null;
+      fillBedPicker("");
     }
     dialog.showModal();
     f.name.focus();
@@ -250,12 +259,23 @@
       sun: f.sun.value,
       notes: f.notes.value.trim(),
       lastWatered: existing ? existing.lastWatered : "",
+      guideId: dialogMeta ? dialogMeta.guideId : (existing ? existing.guideId : null),
+      spacingIn: dialogMeta ? dialogMeta.spacingIn : (existing ? existing.spacingIn : null),
     };
-    if (existing) Object.assign(existing, data);
-    else plants.push(data);
-    save();
+    let plant;
+    if (existing) { Object.assign(existing, data); plant = existing; }
+    else { plants.push(data); plant = data; }
+
+    const chosenBedId = f.placeBed ? f.placeBed.value : "";
+    const status = syncPlantPlacement(plant, chosenBedId);
+    save(); saveBeds();
     render();
+    if (typeof renderBeds === "function") renderBeds();
     dialog.close();
+    if (status === "full") {
+      const b = bedById(chosenBedId);
+      alert(`No open square in "${b ? b.name : "that bed"}" — the plant is tracked in My Garden but not placed. Free up space or resize plants, then set the bed again.`);
+    }
   });
 
   document.getElementById("cancelBtn").addEventListener("click", () => dialog.close());
@@ -586,6 +606,8 @@
     if (gp.tips) noteParts.push(gp.tips);
     if (gp.sources && gp.sources[0]) noteParts.push(`Source: ${gp.sources[0].name}.`);
     f.notes.value = noteParts.filter(Boolean).join(" ");
+    dialogMeta = { guideId: gp.id, spacingIn: gp.spacingIn || null };
+    fillBedPicker("");
     dialog.showModal();
     f.name.focus();
   }
@@ -1030,6 +1052,66 @@
     b.plantings = (b.plantings || []).filter((pl) => pl.id !== plantingId);
     plants = plants.filter((p) => p.id !== plantingId);
     save(); saveBeds();
+  }
+
+  // --- linking My Garden plants to beds (auto-placement from the plant dialog) ---
+  function firstOpenCell(b, w, h) {
+    const cols = bedCols(b), rows = bedRows(b);
+    for (let r = 0; r + h <= rows; r++)
+      for (let c = 0; c + w <= cols; c++)
+        if (footprintClear(b, c, r, w, h)) return { col: c, row: r };
+    return null;
+  }
+  function placementSpacing(plant) {
+    if (plant.spacingIn) return plant.spacingIn;
+    if (plant.guideId) { const s = guideSpacing(plant.guideId); if (s) return s; }
+    const gp = guidePlants().find((g) => g.name && g.name.toLowerCase() === (plant.name || "").toLowerCase());
+    return gp && gp.spacingIn ? gp.spacingIn : CELL_IN;
+  }
+  function bedById(id) { return beds.find((b) => b.id === id) || null; }
+  function plantingBed(plant) {
+    return beds.find((b) => (b.plantings || []).some((pl) => pl.id === plant.id)) || null;
+  }
+  function detachFromBed(plant) {
+    const b = plantingBed(plant);
+    if (b) b.plantings = b.plantings.filter((pl) => pl.id !== plant.id);
+    plant.bedId = null;
+  }
+  // Reconcile a plant's bed link with the picker choice. Returns a status string.
+  function syncPlantPlacement(plant, chosenBedId) {
+    const current = plantingBed(plant);
+    const currentId = current ? current.id : "";
+    if ((chosenBedId || "") === currentId) {
+      // unchanged — keep the grid cell, just refresh the planting's label/emoji
+      if (current) {
+        const pl = current.plantings.find((p) => p.id === plant.id);
+        if (pl) { pl.name = plant.name; pl.emoji = plantEmoji(plant.name); }
+      }
+      return "same";
+    }
+    detachFromBed(plant);
+    if (!chosenBedId) return "removed";
+    const b = bedById(chosenBedId);
+    if (!b) return "removed";
+    const g = plantGeom(placementSpacing(plant));
+    const cell = firstOpenCell(b, g.w, g.h);
+    if (!cell) return "full";
+    b.plantings = b.plantings || [];
+    b.plantings.push({
+      id: plant.id, col: cell.col, row: cell.row, wCells: g.w, hCells: g.h,
+      name: plant.name, guideId: plant.guideId || null, qty: 1,
+      spacingIn: plant.spacingIn || null, emoji: plantEmoji(plant.name),
+    });
+    plant.bedId = b.id;
+    plant.location = b.name;
+    return "placed";
+  }
+  function fillBedPicker(selectedId) {
+    if (!f.placeBed) return;
+    if (placeBedRow) placeBedRow.hidden = beds.length === 0;
+    f.placeBed.innerHTML = '<option value="">— Not in a bed —</option>' +
+      beds.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
+    f.placeBed.value = selectedId || "";
   }
 
   function lostPlantings(b) {
