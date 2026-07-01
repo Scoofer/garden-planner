@@ -44,6 +44,7 @@
   const emptyEl = document.getElementById("emptyState");
   const summaryEl = document.getElementById("summary");
   const filterEl = document.getElementById("filter");
+  const sortEl = document.getElementById("sort");
   const dialog = document.getElementById("plantDialog");
   const form = document.getElementById("plantForm");
   const dialogTitle = document.getElementById("dialogTitle");
@@ -124,11 +125,38 @@
     ));
   }
 
+  // Format a plant name as "Crop, Variety" so varieties group under their crop
+  // (e.g. name "Sugar Baby Watermelon" + crop "Watermelon" -> "Watermelon, Sugar Baby").
+  function cropVarietyName(name, crop) {
+    name = String(name || "").trim();
+    crop = String(crop || "").trim();
+    if (!crop || crop.toLowerCase() === name.toLowerCase()) return name || crop;
+    const re = new RegExp("\\s*" + crop.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*", "i");
+    const variety = name.replace(re, " ").trim();
+    return variety ? crop + ", " + variety : crop;
+  }
+
+  // Best-effort crop for a tracked (My Garden) plant: stored crop, else look up
+  // the matching guide plant by name.
+  function plantCrop(p) {
+    if (p.crop) return p.crop;
+    const gp = guidePlants().find((g) => g.name && p.name && g.name.toLowerCase() === p.name.toLowerCase());
+    return gp ? gp.crop || "" : "";
+  }
+
+  function trackedDisplayName(p) {
+    return cropVarietyName(p.name, plantCrop(p));
+  }
+
   // --- Rendering ---
   function render() {
     renderWeatherPanel();
     const filter = filterEl.value;
+    const sortMode = sortEl ? sortEl.value : "thirsty";
     const sorted = [...plants].sort((a, b) => {
+      if (sortMode === "az") {
+        return trackedDisplayName(a).toLowerCase().localeCompare(trackedDisplayName(b).toLowerCase());
+      }
       const da = daysUntilWater(a), db = daysUntilWater(b);
       return (da === null ? 9999 : da) - (db === null ? 9999 : db);
     });
@@ -173,7 +201,7 @@
     return `
       <article class="card ${st.cls}" data-id="${p.id}">
         <div class="card-top">
-          <h3>${escapeHtml(p.name)}</h3>
+          <h3>${escapeHtml(trackedDisplayName(p))}</h3>
           <span class="badge ${st.badge}">${st.label}</span>
         </div>
         ${meta.length ? `<p class="meta">${meta.join("")}</p>` : ""}
@@ -260,6 +288,7 @@
 
   // --- Toolbar ---
   filterEl.addEventListener("change", render);
+  if (sortEl) sortEl.addEventListener("change", render);
 
   // --- Settings dialog ---
   const settingsDialog = document.getElementById("settingsDialog");
@@ -445,6 +474,9 @@
       if (!q) return true;
       return (p.name + " " + (p.crop || "") + " " + (p.latin || "")).toLowerCase().includes(q);
     });
+    items.sort((a, b) =>
+      cropVarietyName(a.name, a.crop).toLowerCase().localeCompare(cropVarietyName(b.name, b.crop).toLowerCase())
+    );
 
     if (filter === "now" && hasZone && !frostFree) {
       items = items.filter((p) => plantMonthSet(p, currentZone).has(thisMonth));
@@ -506,7 +538,7 @@
     return `
       <article class="card guide-card${p.custom ? " custom-card" : ""}" data-id="${p.id}">
         <div class="card-top">
-          <h3>${escapeHtml(p.name)}${p.custom ? ` <span class="badge custom-badge">Custom</span>` : ""}</h3>
+          <h3>${escapeHtml(cropVarietyName(p.name, p.crop))}${p.custom ? ` <span class="badge custom-badge">Custom</span>` : ""}</h3>
           ${nowBadge}
         </div>
         ${latinLine}
