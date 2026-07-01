@@ -229,6 +229,18 @@ window.GARDEN_DATA = (function () {
       tips: "Mix of colorful cherry tomatoes, ~70 days from transplant. Indeterminate — keep picking to encourage more fruit; support the vines.",
       sources: [ANNIES],
     },
+    {
+      id: "garlic",
+      name: "Garlic",
+      crop: "Garlic", latin: "Allium sativum",
+      sun: "Full sun", spacingIn: 5, rowIn: 12, depthIn: 2,
+      daysToMaturity: 240, perennial: false,
+      methods: [
+        { type: "Plant cloves (fall)", anchor: "firstFall", startWk: -2, endWk: 4 },
+      ],
+      tips: "Plant individual cloves in fall, pointy end up, ~2\" deep, and mulch heavily for winter. Roots establish before the ground freezes, then bulbs size up the following summer — harvest when the lower leaves brown (usually mid-summer). Hardneck types (e.g. 'Music', 'Chesnok Red') are the most cold-hardy and best for colder zones; softneck types (e.g. 'Inchelium Red') store longer. Snap off flower scapes on hardnecks to boost bulb size.",
+      sources: [ANNIES],
+    },
   ];
 
   return { ZONE_FROST, PLANTS };
