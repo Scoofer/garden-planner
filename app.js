@@ -241,22 +241,28 @@
       : "";
 
     const harv = harvestEstimate(p);
-    let harvestNote = "";
+    let harvestNote = "", harvestClass = "", harvestBadge = "";
     if (harv) {
       const readyStr = harv.ready.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
       if (harv.daysLeft > 0) {
         const soon = harv.daysLeft <= 14;
         harvestNote = `<p class="harvest-note${soon ? " soon" : ""}">🧺 Est. harvest in ~${harv.daysLeft} day${harv.daysLeft === 1 ? "" : "s"} <span class="muted">(around ${readyStr})</span>${soon && harv.cues ? `<br><span class="cue">${escapeHtml(harv.cues)}</span>` : ""}</p>`;
+        if (soon) { harvestClass = " harvest-soon"; harvestBadge = `<span class="badge harvest-soon">🧺 Harvest soon</span>`; }
       } else {
         harvestNote = `<p class="harvest-note ready">🧺 Harvest window open <span class="muted">(est. matured ${readyStr})</span>${harv.cues ? `<br><span class="cue">${escapeHtml(harv.cues)}</span>` : ""}</p>`;
+        harvestClass = " harvest-ready";
+        harvestBadge = `<span class="badge harvest-ready">🧺 Ready to harvest</span>`;
       }
     }
 
     return `
-      <article class="card ${st.cls}" data-id="${p.id}">
+      <article class="card ${st.cls}${harvestClass}" data-id="${p.id}">
         <div class="card-top">
           <h3>${escapeHtml(trackedDisplayName(p))}</h3>
-          <span class="badge ${st.badge}">${st.label}</span>
+          <div class="badge-stack">
+            <span class="badge ${st.badge}">${st.label}</span>
+            ${harvestBadge}
+          </div>
         </div>
         ${meta.length ? `<p class="meta">${meta.join("")}</p>` : ""}
         ${rainNote}

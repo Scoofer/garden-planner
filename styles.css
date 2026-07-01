@@ -148,7 +148,12 @@ select, input, textarea {
 .card.thirsty { border-left-color: var(--thirsty); background: linear-gradient(0deg, var(--thirsty-bg), #fff 60%); }
 .card.soon { border-left-color: var(--amber); }
 
+/* Harvest accent — a warm top stripe, kept separate from the watering border-left. */
+.card.harvest-soon { box-shadow: inset 0 4px 0 #f0b429, var(--shadow); }
+.card.harvest-ready { box-shadow: inset 0 4px 0 #e8730c, var(--shadow); }
+
 .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
+.badge-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; }
 .card h3 { margin: 0; font-size: 1.15rem; }
 .badge {
   font-size: 0.72rem;
@@ -160,6 +165,8 @@ select, input, textarea {
 .badge.ok { background: var(--green-light); color: var(--green-dark); }
 .badge.thirsty { background: var(--thirsty-bg); color: var(--thirsty); }
 .badge.soon { background: #fff3e0; color: var(--amber); }
+.badge.harvest-soon { background: #fdf0d5; color: #97710a; }
+.badge.harvest-ready { background: #ffe0c2; color: #b4520a; }
 .badge.custom-badge { background: #eef; color: #4a4aa0; }
 .field-hint { display: block; font-weight: 400; font-size: 0.78rem; color: var(--muted); margin-top: 0.2rem; }
 .guide-card.custom-card { border-left: 3px solid #8f8fd6; }
