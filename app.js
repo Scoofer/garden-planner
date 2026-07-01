@@ -1154,6 +1154,13 @@
   }
 
   // --- SVG grid ---
+  // Shorten a plant name to fit a planting square (varieties usually lead, so a
+  // front-truncation keeps the distinguishing part, e.g. "Sugar Baby Waterme…").
+  function truncLabel(name, maxChars) {
+    const s = String(name || "").trim();
+    if (s.length <= maxChars) return s;
+    return s.slice(0, Math.max(1, maxChars - 1)).trim() + "…";
+  }
   function buildBedSvg(b, interactive, conflictIds, showHandles) {
     const cols = bedCols(b), rows = bedRows(b);
     const blocked = new Set(b.blocked || []);
@@ -1190,8 +1197,17 @@
       const attrs = interactive ? ` data-planting="${pl.id}"` : "";
       p.push(`<g class="bed-planting"${attrs}>`);
       p.push(`<rect x="${x0 + 0.07}" y="${y0 + 0.07}" width="${w - 0.14}" height="${h - 0.14}" rx="0.12" fill="#e5f2df" stroke="#5a9247" stroke-width="0.05" vector-effect="non-scaling-stroke"></rect>`);
-      p.push(`<text x="${x0 + w / 2}" y="${y0 + h / 2}" text-anchor="middle" dy="0.35em" font-size="${Math.min(w, h) * 0.52}">${pl.emoji || "🌱"}</text>`);
-      if (pl.qty > 1) p.push(`<text x="${x0 + w - 0.12}" y="${y0 + h - 0.14}" text-anchor="end" dominant-baseline="central" font-size="0.24" fill="#3a5a2c">×${pl.qty}</text>`);
+      const labelHere = interactive && pl.name;
+      const emojiCY = labelHere ? y0 + h * 0.40 : y0 + h / 2;
+      const emojiSize = Math.min(w, h) * (labelHere ? 0.46 : 0.52);
+      p.push(`<text x="${x0 + w / 2}" y="${emojiCY}" text-anchor="middle" dy="0.35em" font-size="${emojiSize}" style="pointer-events:none">${pl.emoji || "🌱"}</text>`);
+      if (labelHere) {
+        const labelSize = Math.min(0.2, 0.14 + Math.min(w, h) * 0.02);
+        const maxChars = Math.max(6, Math.floor((w - 0.16) / (labelSize * 0.6)));
+        const label = escapeHtml(truncLabel(pl.name, maxChars));
+        p.push(`<text class="pl-label" x="${x0 + w / 2}" y="${y0 + h - 0.12}" text-anchor="middle" font-size="${labelSize}" fill="#2f5a1f" style="pointer-events:none">${label}</text>`);
+      }
+      if (pl.qty > 1) p.push(`<text x="${x0 + w - 0.1}" y="${y0 + 0.1}" text-anchor="end" dominant-baseline="hanging" font-size="0.22" fill="#3a5a2c" style="pointer-events:none">×${pl.qty}</text>`);
       if (conflicts.has(pl.id)) p.push(`<rect x="${x0 + 0.02}" y="${y0 + 0.02}" width="${w - 0.04}" height="${h - 0.04}" rx="0.14" fill="none" stroke="#e6893a" stroke-width="0.08" stroke-dasharray="0.16 0.12" vector-effect="non-scaling-stroke" pointer-events="none"></rect>`);
       if (interactive && showHandles) p.push(`<rect class="pl-handle" data-resize-planting="${pl.id}" x="${x0 + w - 0.3}" y="${y0 + h - 0.3}" width="0.28" height="0.28" rx="0.06" fill="#5a9247" stroke="#ffffff" stroke-width="0.035" vector-effect="non-scaling-stroke"></rect>`);
       p.push(`</g>`);
