@@ -818,6 +818,53 @@
     return out;
   }
 
+  // --- companion planting ---
+  // Map a planting to a companion "group" via its guide crop or its name.
+  function plantGroup(pl) {
+    const groups = (DATA.COMPANIONS && DATA.COMPANIONS.groups) || {};
+    let hay = (pl.name || "").toLowerCase();
+    if (pl.guideId) {
+      const gp = (DATA.PLANTS || []).find((p) => p.id === pl.guideId);
+      if (gp) hay += " " + (gp.crop || "").toLowerCase() + " " + (gp.name || "").toLowerCase();
+    }
+    for (const key in groups) {
+      if (groups[key].some((kw) => hay.includes(kw))) return key;
+    }
+    return null;
+  }
+  function companionReason(g1, g2) {
+    const r = (DATA.COMPANIONS && DATA.COMPANIONS.reasons) || {};
+    return r[g1 + "|" + g2] || r[g2 + "|" + g1] || "";
+  }
+  function pairInList(list, g1, g2) {
+    return (list || []).some((p) => (p[0] === g1 && p[1] === g2) || (p[0] === g2 && p[1] === g1));
+  }
+  // Two plantings are "neighbors" if their footprints touch or sit within one
+  // cell of each other (companion effects are about close proximity).
+  function areNeighbors(A, B) {
+    const aw = A.wCells || 1, ah = A.hCells || 1, bw = B.wCells || 1, bh = B.hCells || 1;
+    const gapX = Math.max(0, Math.max(A.col - (B.col + bw), B.col - (A.col + aw)));
+    const gapY = Math.max(0, Math.max(A.row - (B.row + bh), B.row - (A.row + ah)));
+    return gapX <= 1 && gapY <= 1;
+  }
+  // Classify adjacent planting pairs into good/bad companion relationships.
+  function companionPairs(b) {
+    const C = DATA.COMPANIONS;
+    const out = { good: [], bad: [] };
+    if (!C) return out;
+    const pls = b.plantings || [];
+    for (let i = 0; i < pls.length; i++) for (let j = i + 1; j < pls.length; j++) {
+      const A = pls[i], B = pls[j];
+      if (!areNeighbors(A, B)) continue;
+      const g1 = plantGroup(A), g2 = plantGroup(B);
+      if (!g1 || !g2 || g1 === g2) continue;
+      const rec = { a: A, b: B, reason: companionReason(g1, g2) };
+      if (pairInList(C.bad, g1, g2)) out.bad.push(rec);
+      else if (pairInList(C.good, g1, g2)) out.good.push(rec);
+    }
+    return out;
+  }
+
   function plantEmoji(name) {
     const n = (name || "").toLowerCase();
     const map = [
@@ -1035,6 +1082,19 @@
     const warnHtml = conflicts.length
       ? `<div class="bed-warn">⚠️ ${conflicts.length} spacing conflict${conflicts.length > 1 ? "s" : ""}: ${conflicts.slice(0, 3).map((c) => `${escapeHtml(c.a.name)} &amp; ${escapeHtml(c.b.name)} (need ~${Math.round(c.need)}″, have ${Math.round(c.have)}″)`).join("; ")}${conflicts.length > 3 ? "…" : ""}</div>`
       : "";
+    const comp = companionPairs(b);
+    const dedupePairs = (arr) => {
+      const seen = new Set(), res = [];
+      arr.forEach((r) => { const k = [r.a.name, r.b.name].sort().join("|"); if (!seen.has(k)) { seen.add(k); res.push(r); } });
+      return res;
+    };
+    const badP = dedupePairs(comp.bad), goodP = dedupePairs(comp.good);
+    const compHtml = (badP.length || goodP.length)
+      ? `<div class="bed-companions">
+          ${badP.length ? `<div class="comp-line comp-bad">👎 <b>Poor neighbors:</b> ${badP.map((r) => `${escapeHtml(r.a.name)} &amp; ${escapeHtml(r.b.name)}${r.reason ? ` — ${escapeHtml(r.reason)}` : ""}`).join("; ")}</div>` : ""}
+          ${goodP.length ? `<div class="comp-line comp-good">👍 <b>Good neighbors:</b> ${goodP.map((r) => `${escapeHtml(r.a.name)} &amp; ${escapeHtml(r.b.name)}`).join("; ")}</div>` : ""}
+        </div>`
+      : "";
     const resize = b.shape === "circle"
       ? `<div class="resize-group"><span>Diameter</span><button data-resize="d-">−</button><b>${b.diameterFt} ft</b><button data-resize="d+">+</button></div>`
       : `<div class="resize-group"><span>Width</span><button data-resize="w-">−</button><b>${b.widthFt} ft</b><button data-resize="w+">+</button></div>
@@ -1057,6 +1117,7 @@
       <p class="bed-hint">${toolHint(b)}</p>
       ${warnHtml}
       <div class="bed-grid-wrap">${buildBedSvg(b, true, conflictIds, bedResizeMode)}</div>
+      ${compHtml}
       <p class="bed-summary muted">🟩 ${s.used}/${s.usable} squares used · 🌱 ${s.plantings} planting${s.plantings === 1 ? "" : "s"}${s.blocked ? ` · 🧱 ${s.blocked} path` : ""}</p>`;
   }
 

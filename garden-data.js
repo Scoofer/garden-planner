@@ -243,5 +243,51 @@ window.GARDEN_DATA = (function () {
     },
   ];
 
-  return { ZONE_FROST, PLANTS };
+  // Companion planting: relationships between crop "groups" (not individual
+  // varieties). Each planting maps to a group via its crop; adjacent plantings
+  // are checked against these lists. Based on widely-cited companion guides.
+  const COMPANIONS = {
+    // group key -> matching keywords found in a plant's crop/name (lowercased)
+    groups: {
+      tomato: ["tomato"],
+      allium: ["garlic", "onion", "shallot", "leek", "chive"],
+      carrot: ["carrot"],
+      bean: ["bean"],
+      pea: ["pea"],
+      cucumber: ["cucumber"],
+      squash: ["squash", "zucchini", "pumpkin", "gourd"],
+      melon: ["melon", "watermelon", "muskmelon", "cantaloupe"],
+      asparagus: ["asparagus"],
+    },
+    good: [
+      ["tomato", "allium"], ["tomato", "carrot"], ["tomato", "asparagus"],
+      ["allium", "carrot"], ["allium", "asparagus"], ["allium", "tomato"],
+      ["bean", "carrot"], ["bean", "cucumber"], ["bean", "squash"],
+      ["bean", "melon"], ["bean", "pea"], ["pea", "carrot"], ["pea", "cucumber"],
+      ["carrot", "cucumber"], ["squash", "melon"],
+    ],
+    bad: [
+      ["allium", "bean"], ["allium", "pea"],
+    ],
+    reasons: {
+      "allium|bean": "Onions & garlic can stunt beans",
+      "allium|pea": "Onions & garlic can stunt peas",
+      "tomato|allium": "Alliums help repel tomato pests",
+      "tomato|carrot": "Classic pairing — grow well together",
+      "tomato|asparagus": "Each repels the other's pests",
+      "allium|carrot": "Alliums deter carrot fly",
+      "allium|asparagus": "Garlic repels asparagus beetle",
+      "bean|carrot": "Beans fix nitrogen carrots use",
+      "bean|cucumber": "Mutually beneficial",
+      "bean|squash": "Three-sisters style pairing",
+      "bean|melon": "Beans enrich soil for melons",
+      "bean|pea": "Both legumes — grow well together",
+      "pea|carrot": "Peas fix nitrogen carrots use",
+      "pea|cucumber": "Mutually beneficial",
+      "carrot|cucumber": "Grow well together",
+      "squash|melon": "Similar needs — compatible",
+    },
+  };
+
+  return { ZONE_FROST, PLANTS, COMPANIONS };
 })();
