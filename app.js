@@ -63,11 +63,14 @@
   const locationRow = document.getElementById("locationRow");
   // Metadata for the plant currently in the dialog, used to place it in a bed.
   let dialogMeta = null;
-  // Free-text location only matters when the plant isn't assigned to a bed.
+  // Free-text location only matters when the plant isn't in a bed. It shows when
+  // "Not in a bed" is explicitly chosen, or when there are no beds to pick from.
+  // The neutral "— Select —" default keeps it hidden.
   function toggleLocationField() {
     if (!locationRow) return;
-    const inBed = !!(f.placeBed && beds.length > 0 && f.placeBed.value);
-    locationRow.hidden = inBed;
+    const noBeds = beds.length === 0;
+    const notInBed = f.placeBed && f.placeBed.value === "none";
+    locationRow.hidden = !(noBeds || notInBed);
   }
 
   // --- Persistence ---
@@ -240,7 +243,8 @@
       f.notes.value = plant.notes || "";
       dialogMeta = { guideId: plant.guideId || null, spacingIn: plant.spacingIn || null };
       const cur = plantingBed(plant);
-      fillBedPicker(cur ? cur.id : (plant.bedId || ""));
+      // In a bed -> its bed; has a free-text location -> "Not in a bed"; else neutral.
+      fillBedPicker(cur ? cur.id : (plant.location ? "none" : ""));
     } else {
       dialogTitle.textContent = "Add plant";
       f.id.value = "";
@@ -273,7 +277,8 @@
     if (existing) { Object.assign(existing, data); plant = existing; }
     else { plants.push(data); plant = data; }
 
-    const chosenBedId = f.placeBed ? f.placeBed.value : "";
+    const val = f.placeBed ? f.placeBed.value : "";
+    const chosenBedId = (val && val !== "none") ? val : "";
     const status = syncPlantPlacement(plant, chosenBedId);
     save(); saveBeds();
     render();
@@ -1117,7 +1122,7 @@
   function fillBedPicker(selectedId) {
     if (!f.placeBed) return;
     if (placeBedRow) placeBedRow.hidden = beds.length === 0;
-    f.placeBed.innerHTML = '<option value="">— Not in a bed —</option>' +
+    f.placeBed.innerHTML = '<option value="">— Select —</option><option value="none">Not in a bed</option>' +
       beds.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
     f.placeBed.value = selectedId || "";
     toggleLocationField();
