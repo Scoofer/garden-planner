@@ -168,6 +168,10 @@ select, input, textarea {
 .badge.harvest-soon { background: #fdf0d5; color: #97710a; }
 .badge.harvest-ready { background: #ffe0c2; color: #b4520a; }
 .badge.custom-badge { background: #eef; color: #4a4aa0; }
+.badge.seed-sow { background: #e3f0d8; color: #3f6b1e; }
+.badge.seed-soon { background: #eef5e4; color: #5a7a3a; }
+.badge.seed-harden { background: #e0f0f4; color: #1f6b7a; }
+.badge.seed-transplant { background: #d8ead8; color: #2e6b3e; }
 .field-hint { display: block; font-weight: 400; font-size: 0.78rem; color: var(--muted); margin-top: 0.2rem; }
 .guide-card.custom-card { border-left: 3px solid #8f8fd6; }
 
@@ -238,6 +242,22 @@ select, input, textarea {
 .harvest-note.soon { color: #7a5a00; background: #fff8e1; }
 .harvest-note.ready { color: #8a4b00; background: #ffe9cf; font-weight: 600; }
 .harvest-note .cue { display: inline-block; margin-top: 0.2rem; font-weight: 400; color: var(--muted); }
+
+/* Seed-starting — Planting Guide plan block */
+.seed-guide { margin-top: 0.6rem; padding: 0.6rem 0.75rem; background: #f2f8ec; border: 1px solid #d6e6c6; border-radius: 10px; }
+.seed-guide h4 { margin: 0 0 0.35rem; font-size: 0.9rem; color: #3f6b1e; }
+.seed-guide p { margin: 0.25rem 0; font-size: 0.85rem; line-height: 1.35; }
+.seed-guide strong { color: var(--text); }
+
+/* Seed-starting — My Garden seasonal to-dos */
+.seed-tasks { margin: 0 0 1rem; padding: 0.75rem 0.9rem; background: #f2f8ec; border: 1px solid #d6e6c6; border-radius: 12px; }
+.seed-tasks-title { margin: 0 0 0.5rem; font-size: 0.95rem; color: #3f6b1e; }
+.seed-tasks-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.seed-tasks-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; font-size: 0.88rem; padding: 0.4rem 0.55rem; border-radius: 8px; background: #fff; border-left: 3px solid #7fae4e; }
+.seed-tasks-list li.seed-harden { border-left-color: #3fa0b4; }
+.seed-tasks-list li.seed-transplant { border-left-color: #4a9e5a; }
+.seed-tasks-list .seed-task-act { font-weight: 700; color: var(--text); }
+.seed-tasks-list .seed-task-name { font-weight: 600; }
 
 .backup { margin-top: 2rem; border-top: 1px dashed var(--border); padding-top: 1.25rem; }
 .backup h2 { margin: 0 0 0.25rem; font-size: 1.05rem; }

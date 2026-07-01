@@ -224,6 +224,7 @@
       summaryEl.hidden = true;
     }
     if (typeof updateBackupBanner === "function") updateBackupBanner();
+    if (typeof renderSeedTasks === "function") renderSeedTasks();
   }
 
   function cardHtml(p) {
@@ -554,6 +555,7 @@
     localStorage.setItem(ZONE_KEY, currentZone);
     updateZoneUI();
     renderGuide();
+    if (typeof renderSeedTasks === "function") renderSeedTasks();
   });
   guideSearch.addEventListener("input", renderGuide);
   guideFilter.addEventListener("change", renderGuide);
@@ -597,6 +599,86 @@
       if (mm) mm.forEach((x) => all.add(x));
     });
     return all;
+  }
+
+  // ---- Seed-starting timeline (crops that can be started indoors) ----
+  function hasIndoorStart(plant) {
+    return (plant.methods || []).some((m) => m.type === "Start indoors");
+  }
+  // Concrete dates for a given calendar year, using the zone's last-frost date.
+  function seedTimeline(plant, zone, year) {
+    const z = DATA.ZONE_FROST[zone];
+    if (!z || z.frostFree) return null;
+    const indoor = (plant.methods || []).find((m) => m.type === "Start indoors");
+    if (!indoor) return null;
+    const lf = new Date(year, z.lastFrost[0] - 1, z.lastFrost[1]);
+    const addWk = (wk) => new Date(lf.getTime() + wk * 7 * MS_PER_DAY);
+    const tp = (plant.methods || []).find((m) => /transplant/i.test(m.type));
+    const transplant = tp ? addWk(tp.startWk) : addWk(0);
+    const tpEnd = tp ? addWk(tp.endWk) : transplant;
+    return {
+      sowStart: addWk(indoor.startWk),
+      sowEnd: addWk(indoor.endWk),
+      hardenOff: new Date(transplant.getTime() - 7 * MS_PER_DAY),
+      transplant,
+      tpEnd,
+    };
+  }
+  // Upcoming-season plan: rolls to next year once this year's window has passed.
+  function seedPlan(plant, zone, today) {
+    let year = today.getFullYear();
+    let t = seedTimeline(plant, zone, year);
+    if (!t) return null;
+    if (today > t.tpEnd) { year += 1; t = seedTimeline(plant, zone, year); }
+    return { t, year };
+  }
+  // Which seed-starting action (if any) is due for this crop right now / soon.
+  function seedAction(plant, zone, today) {
+    const t = seedTimeline(plant, zone, today.getFullYear());
+    if (!t) return null;
+    const soon = 10 * MS_PER_DAY;
+    if (today >= t.sowStart && today <= t.sowEnd)
+      return { key: "sow", label: "🌱 Start seeds indoors now", cls: "seed-sow", date: t.sowEnd };
+    if (today >= new Date(t.sowStart.getTime() - soon) && today < t.sowStart)
+      return { key: "sow-soon", label: "🌱 Start seeds soon", cls: "seed-soon", date: t.sowStart };
+    if (today >= t.hardenOff && today < t.transplant)
+      return { key: "harden", label: "🌤️ Harden off now", cls: "seed-harden", date: t.transplant };
+    if (today >= t.transplant && today <= t.tpEnd)
+      return { key: "transplant", label: "🌱 Safe to transplant now", cls: "seed-transplant", date: t.tpEnd };
+    return null;
+  }
+  function fmtSeedDate(d, withYear) {
+    return d.toLocaleDateString(undefined, withYear
+      ? { month: "short", day: "numeric", year: "numeric" }
+      : { month: "short", day: "numeric" });
+  }
+
+  // My Garden seasonal reminders: crops whose seed-starting action is due now/soon.
+  function renderSeedTasks() {
+    const el = document.getElementById("seedTasks");
+    if (!el) return;
+    const zone = currentZone;
+    if (!zone || !DATA.ZONE_FROST[zone] || DATA.ZONE_FROST[zone].frostFree) {
+      el.hidden = true; el.innerHTML = ""; return;
+    }
+    const today = new Date();
+    const items = [];
+    guidePlants().forEach((p) => {
+      if (!hasIndoorStart(p)) return;
+      const act = seedAction(p, zone, today);
+      if (act) items.push({ name: cropVarietyName(p.name, p.crop), act });
+    });
+    if (!items.length) { el.hidden = true; el.innerHTML = ""; return; }
+    const order = { sow: 0, "sow-soon": 1, harden: 2, transplant: 3 };
+    items.sort((a, b) => (order[a.act.key] - order[b.act.key]) || a.name.localeCompare(b.name));
+    el.hidden = false;
+    el.innerHTML =
+      `<h3 class="seed-tasks-title">🌱 Seed-starting to-dos <span class="muted">(Zone ${escapeHtml(zone.toUpperCase())})</span></h3>` +
+      `<ul class="seed-tasks-list">` +
+      items.map((it) =>
+        `<li class="${it.act.cls}"><span class="seed-task-act">${it.act.label}</span> <span class="seed-task-name">${escapeHtml(it.name)}</span> <span class="muted">by ${fmtSeedDate(it.act.date, false)}</span></li>`
+      ).join("") +
+      `</ul>`;
   }
 
   function renderGuide() {
@@ -673,6 +755,27 @@
           ${p.harvest.storage ? `<p><strong>Storing:</strong> ${escapeHtml(p.harvest.storage)}</p>` : ""}
         </div>` : "";
 
+    let seedBlock = "";
+    let seedBadge = "";
+    if (hasZone && !frostFree && hasIndoorStart(p)) {
+      const today = new Date();
+      const plan = seedPlan(p, currentZone, today);
+      if (plan) {
+        const t = plan.t;
+        const wy = plan.year !== today.getFullYear();
+        const range = t.sowEnd > t.sowStart ? ` – ${fmtSeedDate(t.sowEnd, wy)}` : "";
+        seedBlock = `
+        <div class="seed-guide">
+          <h4>🌱 Seed-starting plan <span class="muted">(Zone ${escapeHtml(currentZone.toUpperCase())})</span></h4>
+          <p><strong>Start seeds indoors:</strong> ${fmtSeedDate(t.sowStart, wy)}${range}</p>
+          <p><strong>Harden off:</strong> ~${fmtSeedDate(t.hardenOff, wy)}</p>
+          <p><strong>Transplant out (earliest safe):</strong> ${fmtSeedDate(t.transplant, wy)}</p>
+        </div>`;
+      }
+      const act = seedAction(p, currentZone, today);
+      if (act) seedBadge = `<span class="badge ${act.cls}">${act.label}</span>`;
+    }
+
     const actions = p.custom
       ? `<button class="water-btn" data-act="add">+ Add to my garden</button>
          <button data-act="edit-custom">Edit</button>
@@ -684,9 +787,11 @@
         <div class="card-top">
           <h3>${escapeHtml(cropVarietyName(p.name, p.crop))}${p.custom ? ` <span class="badge custom-badge">Custom</span>` : ""}</h3>
           ${nowBadge}
+          ${seedBadge}
         </div>
         ${latinLine}
         ${timing}
+        ${seedBlock}
         ${facts.length ? `<p class="meta">${facts.join("")}</p>` : ""}
         ${p.tips ? `<p class="notes">${escapeHtml(p.tips)}</p>` : ""}
         ${harvestBlock}
@@ -1819,6 +1924,10 @@
       }
     }
   });
+
+  if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants };
+  }
 
   render();
   updateBackupBanner();
