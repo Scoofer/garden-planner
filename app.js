@@ -1116,8 +1116,8 @@
       <div class="bed-actions"><button class="chip ${bedResizeMode ? "on" : ""}" data-bed-act="toggleresize">📐 Resize plants: ${bedResizeMode ? "On" : "Off"}</button></div>
       <p class="bed-hint">${toolHint(b)}</p>
       ${warnHtml}
-      <div class="bed-grid-wrap">${buildBedSvg(b, true, conflictIds, bedResizeMode)}</div>
       ${compHtml}
+      <div class="bed-grid-wrap">${buildBedSvg(b, true, conflictIds, bedResizeMode)}</div>
       <p class="bed-summary muted">🟩 ${s.used}/${s.usable} squares used · 🌱 ${s.plantings} planting${s.plantings === 1 ? "" : "s"}${s.blocked ? ` · 🧱 ${s.blocked} path` : ""}</p>`;
   }
 
