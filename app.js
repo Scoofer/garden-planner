@@ -896,14 +896,6 @@
       const attrs = interactive ? ` data-col="${c}" data-row="${r}"` : "";
       p.push(`<rect class="bed-cell" x="${off + c}" y="${off + r}" width="1" height="1" fill="${fill}" stroke="${stroke}" stroke-width="0.04" vector-effect="non-scaling-stroke"${attrs}></rect>`);
     }
-    if (needClip) p.push(`</g>`);
-    if (b.shape === "circle") {
-      const R = cols / 2;
-      p.push(`<circle cx="${R}" cy="${R}" r="${R}" fill="none" stroke="#8fb37d" stroke-width="0.08" vector-effect="non-scaling-stroke"></circle>`);
-    }
-    if (rounded && off === 0) {
-      p.push(`<rect x="0" y="0" width="${cols}" height="${rows}" rx="${rx}" ry="${rx}" fill="none" stroke="#8fb37d" stroke-width="0.08" vector-effect="non-scaling-stroke"></rect>`);
-    }
     (b.plantings || []).forEach((pl) => {
       const w = pl.wCells || 1, h = pl.hCells || 1;
       const x0 = off + pl.col, y0 = off + pl.row;
@@ -914,6 +906,14 @@
       if (pl.qty > 1) p.push(`<text x="${x0 + w - 0.12}" y="${y0 + h - 0.14}" text-anchor="end" dominant-baseline="central" font-size="0.24" fill="#3a5a2c">×${pl.qty}</text>`);
       p.push(`</g>`);
     });
+    if (needClip) p.push(`</g>`);
+    if (b.shape === "circle") {
+      const R = cols / 2;
+      p.push(`<circle cx="${R}" cy="${R}" r="${R}" fill="none" stroke="#8fb37d" stroke-width="0.08" vector-effect="non-scaling-stroke"></circle>`);
+    }
+    if (rounded && off === 0) {
+      p.push(`<rect x="0" y="0" width="${cols}" height="${rows}" rx="${rx}" ry="${rx}" fill="none" stroke="#8fb37d" stroke-width="0.08" vector-effect="non-scaling-stroke"></rect>`);
+    }
     p.push(`</svg>`);
     return p.join("");
   }
