@@ -34,7 +34,6 @@ html, body {
   text-align: center;
 }
 .app-header h1 { margin: 0; font-size: 1.5rem; }
-.tagline { margin: 0.35rem 0 0; font-size: 0.8rem; opacity: 0.9; }
 .icon-btn {
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
