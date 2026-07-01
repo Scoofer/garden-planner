@@ -234,6 +234,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 #plantForm h2, #bedForm h2 { margin: 0; }
 #plantForm label, #bedForm label { display: grid; gap: 0.3rem; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
 #plantForm .row, #bedForm .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+#bedForm [hidden] { display: none !important; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin: 0.4rem 0 0; padding: 0; }
 
 .settings-body { padding: 1.25rem; }
