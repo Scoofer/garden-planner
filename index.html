@@ -55,6 +55,11 @@
 
   <main id="guideView" hidden>
     <section class="zone-bar">
+      <div id="zoneDisplay" class="zone-display" hidden>
+        <span>🌡️ Your zone: <strong id="zoneCurrent"></strong></span>
+        <button id="changeZoneBtn" type="button">Change</button>
+      </div>
+      <div id="zoneEdit">
       <label for="zone"><strong>Your USDA zone</strong>
         <select id="zone">
           <option value="">Select your zone…</option>
@@ -87,6 +92,7 @@
         </select>
       </label>
       <p class="muted" id="zoneHint">Each zone has an <strong>a</strong> (colder) and <strong>b</strong> (warmer) half. Not sure? Look up your zone by ZIP at the USDA Plant Hardiness Zone Map. Planting months adjust to your zone.</p>
+      </div>
     </section>
 
     <section class="toolbar">

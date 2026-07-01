@@ -255,6 +255,10 @@
   };
   const tabs = document.querySelectorAll(".tab");
   const zoneSel = document.getElementById("zone");
+  const zoneDisplay = document.getElementById("zoneDisplay");
+  const zoneEdit = document.getElementById("zoneEdit");
+  const zoneCurrent = document.getElementById("zoneCurrent");
+  const changeZoneBtn = document.getElementById("changeZoneBtn");
   const guideSearch = document.getElementById("guideSearch");
   const guideFilter = document.getElementById("guideFilter");
   const guideListEl = document.getElementById("guideList");
@@ -262,6 +266,19 @@
 
   let currentZone = localStorage.getItem(ZONE_KEY) || "";
   if (currentZone) zoneSel.value = currentZone;
+
+  function updateZoneUI() {
+    const isSet = !!(currentZone && DATA.ZONE_FROST[currentZone]);
+    zoneDisplay.hidden = !isSet;
+    zoneEdit.hidden = isSet;
+    if (isSet) zoneCurrent.textContent = currentZone.toUpperCase();
+  }
+  changeZoneBtn.addEventListener("click", () => {
+    zoneDisplay.hidden = true;
+    zoneEdit.hidden = false;
+    zoneSel.focus();
+  });
+  updateZoneUI();
 
   tabs.forEach((t) => t.addEventListener("click", () => switchView(t.dataset.view)));
   function switchView(name) {
@@ -274,6 +291,7 @@
   zoneSel.addEventListener("change", () => {
     currentZone = zoneSel.value;
     localStorage.setItem(ZONE_KEY, currentZone);
+    updateZoneUI();
     renderGuide();
   });
   guideSearch.addEventListener("input", renderGuide);
