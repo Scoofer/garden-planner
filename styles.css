@@ -225,6 +225,13 @@ select, input, textarea {
 .backup-actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
 .muted { color: var(--muted); font-size: 0.85rem; margin: 0.25rem 0; }
 
+.backup-banner { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; justify-content: space-between; margin: 0.75rem 1rem 0; padding: 0.6rem 0.85rem; background: #fff8e1; border: 1px solid #f2d98a; border-radius: var(--radius); color: #7a5a00; font-size: 0.9rem; box-shadow: var(--shadow); }
+.backup-banner[hidden] { display: none; }
+.backup-banner-text { flex: 1 1 12rem; }
+.backup-banner-actions { display: flex; align-items: center; gap: 0.4rem; }
+#backupBannerExport { background: var(--amber); color: #fff; border-color: var(--amber); font-weight: 600; padding: 0.4rem 0.7rem; }
+.banner-dismiss { background: none; border: none; color: #7a5a00; font-size: 1rem; line-height: 1; padding: 0.3rem 0.45rem; cursor: pointer; }
+
 dialog {
   border: none;
   border-radius: 16px;

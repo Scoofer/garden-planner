@@ -19,6 +19,14 @@
     <h1>🌱 Garden Planner</h1>
   </header>
 
+  <div id="backupBanner" class="backup-banner" hidden role="status">
+    <span id="backupBannerText" class="backup-banner-text"></span>
+    <span class="backup-banner-actions">
+      <button id="backupBannerExport" type="button">⬇︎ Back up now</button>
+      <button id="backupBannerDismiss" class="banner-dismiss" type="button" aria-label="Dismiss reminder" title="Remind me later">✕</button>
+    </span>
+  </div>
+
   <nav class="tabs" role="tablist">
     <button class="tab active" data-view="garden" role="tab">🪴 My Garden</button>
     <button class="tab" data-view="guide" role="tab">📅 Planting Guide</button>
@@ -52,6 +60,7 @@
     <section class="backup">
       <h2>Backup</h2>
       <p class="muted">Save or restore your garden data as a file. Nothing is uploaded anywhere.</p>
+      <p id="backupStatus" class="muted"></p>
       <div class="backup-actions">
         <button id="exportBtn">⬇︎ Export backup</button>
         <button id="importBtn">⬆︎ Import backup</button>

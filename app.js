@@ -5,6 +5,12 @@
   const STORAGE_KEY = "garden.plants.v1";
   const MS_PER_DAY = 86400000;
 
+  // --- Backup reminder ---
+  const BACKUP_AT_KEY = "garden.backup.lastAt.v1";      // ms timestamp of last export
+  const BACKUP_SNOOZE_KEY = "garden.backup.snoozeUntil.v1"; // ms timestamp
+  const BACKUP_REMIND_DAYS = 14;   // remind once a backup is this old (or never made)
+  const BACKUP_SNOOZE_DAYS = 3;    // "remind me later" hides the banner this long
+
   // --- Rain-aware watering (opt-in) ---
   const RAIN_ENABLED_KEY = "garden.rain.enabled";
   const RAIN_LOC_KEY = "garden.location.v1";
@@ -335,7 +341,7 @@
   });
 
   // --- Backup: export / import ---
-  document.getElementById("exportBtn").addEventListener("click", () => {
+  function exportBackup() {
     const payload = { version: 2, plants, beds };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -344,7 +350,9 @@
     a.download = `garden-backup-${todayStr()}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  });
+    markBackedUp();
+  }
+  document.getElementById("exportBtn").addEventListener("click", exportBackup);
 
   const importFile = document.getElementById("importFile");
   document.getElementById("importBtn").addEventListener("click", () => importFile.click());
@@ -367,6 +375,7 @@
           saveBeds();
           render();
           if (!views.beds.hidden) renderBeds();
+          updateBackupBanner();
         }
       } catch (err) {
         alert("Couldn't import that file: " + err.message);
@@ -374,6 +383,57 @@
       importFile.value = "";
     };
     reader.readAsText(file);
+  });
+
+  // --- Backup reminder banner ---
+  const backupBanner = document.getElementById("backupBanner");
+  const backupBannerText = document.getElementById("backupBannerText");
+  const backupStatus = document.getElementById("backupStatus");
+
+  function daysAgoLabel(ms) {
+    const d = Math.floor((Date.now() - ms) / MS_PER_DAY);
+    if (d <= 0) return "today";
+    if (d === 1) return "yesterday";
+    return `${d} days ago`;
+  }
+
+  function markBackedUp() {
+    localStorage.setItem(BACKUP_AT_KEY, String(Date.now()));
+    localStorage.removeItem(BACKUP_SNOOZE_KEY);
+    updateBackupBanner();
+  }
+
+  function updateBackupBanner() {
+    const lastAt = parseInt(localStorage.getItem(BACKUP_AT_KEY) || "", 10);
+    const hasBackup = !isNaN(lastAt);
+
+    // Backup-section status line always reflects the truth.
+    if (backupStatus) {
+      backupStatus.textContent = hasBackup
+        ? `Last backup: ${daysAgoLabel(lastAt)}.`
+        : "You haven't exported a backup yet.";
+    }
+
+    if (!backupBanner) return;
+    const hasData = plants.length > 0 || beds.length > 0;
+    const snoozeUntil = parseInt(localStorage.getItem(BACKUP_SNOOZE_KEY) || "", 10);
+    const snoozed = !isNaN(snoozeUntil) && Date.now() < snoozeUntil;
+    const stale = !hasBackup || (Date.now() - lastAt) >= BACKUP_REMIND_DAYS * MS_PER_DAY;
+
+    if (hasData && stale && !snoozed) {
+      backupBannerText.textContent = hasBackup
+        ? `Your last backup was ${daysAgoLabel(lastAt)}. Export a fresh copy so you don't lose your garden.`
+        : "Your garden data lives only on this device. Export a backup so you don't lose it.";
+      backupBanner.hidden = false;
+    } else {
+      backupBanner.hidden = true;
+    }
+  }
+
+  document.getElementById("backupBannerExport").addEventListener("click", exportBackup);
+  document.getElementById("backupBannerDismiss").addEventListener("click", () => {
+    localStorage.setItem(BACKUP_SNOOZE_KEY, String(Date.now() + BACKUP_SNOOZE_DAYS * MS_PER_DAY));
+    updateBackupBanner();
   });
 
   // --- Service worker (offline / installable) ---
@@ -1708,4 +1768,5 @@
   });
 
   render();
+  updateBackupBanner();
 })();
