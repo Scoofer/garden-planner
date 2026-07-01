@@ -902,7 +902,7 @@
       const attrs = interactive ? ` data-planting="${pl.id}"` : "";
       p.push(`<g class="bed-planting"${attrs}>`);
       p.push(`<rect x="${x0 + 0.07}" y="${y0 + 0.07}" width="${w - 0.14}" height="${h - 0.14}" rx="0.12" fill="#e5f2df" stroke="#5a9247" stroke-width="0.05" vector-effect="non-scaling-stroke"></rect>`);
-      p.push(`<text x="${x0 + w / 2}" y="${y0 + h / 2}" text-anchor="middle" dominant-baseline="central" font-size="${Math.min(w, h) * 0.52}">${pl.emoji || "🌱"}</text>`);
+      p.push(`<text x="${x0 + w / 2}" y="${y0 + h / 2}" text-anchor="middle" dy="0.35em" font-size="${Math.min(w, h) * 0.52}">${pl.emoji || "🌱"}</text>`);
       if (pl.qty > 1) p.push(`<text x="${x0 + w - 0.12}" y="${y0 + h - 0.14}" text-anchor="end" dominant-baseline="central" font-size="0.24" fill="#3a5a2c">×${pl.qty}</text>`);
       p.push(`</g>`);
     });
