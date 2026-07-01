@@ -60,8 +60,15 @@
     placeBed: document.getElementById("placeBed"),
   };
   const placeBedRow = document.getElementById("placeBedRow");
+  const locationRow = document.getElementById("locationRow");
   // Metadata for the plant currently in the dialog, used to place it in a bed.
   let dialogMeta = null;
+  // Free-text location only matters when the plant isn't assigned to a bed.
+  function toggleLocationField() {
+    if (!locationRow) return;
+    const inBed = !!(f.placeBed && beds.length > 0 && f.placeBed.value);
+    locationRow.hidden = inBed;
+  }
 
   // --- Persistence ---
   function load() {
@@ -279,6 +286,7 @@
   });
 
   document.getElementById("cancelBtn").addEventListener("click", () => dialog.close());
+  if (f.placeBed) f.placeBed.addEventListener("change", toggleLocationField);
 
   // --- Event delegation for cards ---
   listEl.addEventListener("click", (e) => {
@@ -1112,6 +1120,7 @@
     f.placeBed.innerHTML = '<option value="">— Not in a bed —</option>' +
       beds.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
     f.placeBed.value = selectedId || "";
+    toggleLocationField();
   }
 
   function lostPlantings(b) {
