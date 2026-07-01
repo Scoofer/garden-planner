@@ -160,6 +160,8 @@ select, input, textarea {
 .badge.ok { background: var(--green-light); color: var(--green-dark); }
 .badge.thirsty { background: var(--thirsty-bg); color: var(--thirsty); }
 .badge.soon { background: #fff3e0; color: var(--amber); }
+.badge.custom-badge { background: #eef; color: #4a4aa0; }
+.guide-card.custom-card { border-left: 3px solid #8f8fd6; }
 
 .meta { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; }
 .meta span { display: inline-flex; align-items: center; gap: 0.3rem; }

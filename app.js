@@ -141,7 +141,7 @@
       emptyEl.hidden = false;
       emptyEl.innerHTML = "Nothing needs water right now. 💧✅";
     } else if (plants.length === 0) {
-      emptyEl.innerHTML = 'No plants yet. Tap <strong>“Add plant”</strong> to get started. 🪴';
+      emptyEl.innerHTML = 'No plants yet. Add one from the <strong>📅 Planting Guide</strong> or place plants in a <strong>🗺️ Bed</strong> to start tracking. 🪴';
     }
 
     // Summary
@@ -259,7 +259,6 @@
   });
 
   // --- Toolbar ---
-  document.getElementById("addBtn").addEventListener("click", () => openDialog(null));
   filterEl.addEventListener("change", render);
 
   // --- Settings dialog ---
@@ -325,6 +324,12 @@
   // ===================== Planting Guide =====================
   const DATA = window.GARDEN_DATA || { ZONE_FROST: {}, PLANTS: [] };
   const ZONE_KEY = "garden.zone.v1";
+  const CUSTOM_PLANTS_KEY = "garden.customPlants.v1";
+  let customPlants = loadJson(CUSTOM_PLANTS_KEY, []);
+  function saveCustomPlants() { localStorage.setItem(CUSTOM_PLANTS_KEY, JSON.stringify(customPlants)); }
+  // Built-in guide crops + any custom plants the user added, used everywhere a
+  // guide plant is looked up (guide list, beds palette, spacing, companions).
+  function guidePlants() { return DATA.PLANTS.concat(customPlants); }
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   const views = {
@@ -422,7 +427,7 @@
 
   function plantMonthSet(plant, zone) {
     const all = new Set();
-    plant.methods.forEach((m) => {
+    (plant.methods || []).forEach((m) => {
       const mm = methodMonths(m, zone);
       if (mm) mm.forEach((x) => all.add(x));
     });
@@ -436,9 +441,9 @@
     const hasZone = currentZone && DATA.ZONE_FROST[currentZone];
     const frostFree = hasZone && DATA.ZONE_FROST[currentZone].frostFree;
 
-    let items = DATA.PLANTS.filter((p) => {
+    let items = guidePlants().filter((p) => {
       if (!q) return true;
-      return (p.name + " " + p.crop + " " + p.latin).toLowerCase().includes(q);
+      return (p.name + " " + (p.crop || "") + " " + (p.latin || "")).toLowerCase().includes(q);
     });
 
     if (filter === "now" && hasZone && !frostFree) {
@@ -462,12 +467,14 @@
       ? `<span class="badge thirsty">Plant now</span>` : "";
 
     let timing;
-    if (!hasZone) {
+    if (p.custom && (!p.methods || !p.methods.length)) {
+      timing = `<p class="muted">✨ Custom plant — no planting-calendar info. Use notes for your own schedule.</p>`;
+    } else if (!hasZone) {
       timing = `<p class="muted">Select your zone above to see planting months.</p>`;
     } else if (frostFree) {
       timing = `<p class="meta"><span>🌡️ Frost-free zone — warm-season crops can be sown in most months; cool-season crops do best in the cooler months.</span></p>`;
     } else {
-      timing = `<ul class="timing">` + p.methods.map((m) => {
+      timing = `<ul class="timing">` + (p.methods || []).map((m) => {
         const mm = methodMonths(m, currentZone);
         const isNow = mm && mm.includes(thisMonth);
         return `<li${isNow ? ' class="now"' : ""}><strong>${escapeHtml(m.type)}:</strong> ${monthsLabel(mm)}${isNow ? " • now" : ""}</li>`;
@@ -486,29 +493,49 @@
       s.url ? `<a href="${s.url}" target="_blank" rel="noopener">${escapeHtml(s.name)}</a>` : escapeHtml(s.name)
     ).join(", ");
 
+    const latinLine = p.latin
+      ? `<p class="latin">${escapeHtml(p.crop || "")} · <em>${escapeHtml(p.latin)}</em></p>`
+      : (p.crop ? `<p class="latin">${escapeHtml(p.crop)}</p>` : "");
+
+    const actions = p.custom
+      ? `<button class="water-btn" data-act="add">+ Add to my garden</button>
+         <button data-act="edit-custom">Edit</button>
+         <button data-act="delete-custom">Delete</button>`
+      : `<button class="water-btn" data-act="add">+ Add to my garden</button>`;
+
     return `
-      <article class="card guide-card" data-id="${p.id}">
+      <article class="card guide-card${p.custom ? " custom-card" : ""}" data-id="${p.id}">
         <div class="card-top">
-          <h3>${escapeHtml(p.name)}</h3>
+          <h3>${escapeHtml(p.name)}${p.custom ? ` <span class="badge custom-badge">Custom</span>` : ""}</h3>
           ${nowBadge}
         </div>
-        <p class="latin">${escapeHtml(p.crop)} · <em>${escapeHtml(p.latin)}</em></p>
+        ${latinLine}
         ${timing}
         ${facts.length ? `<p class="meta">${facts.join("")}</p>` : ""}
         ${p.tips ? `<p class="notes">${escapeHtml(p.tips)}</p>` : ""}
         ${src ? `<p class="source">📖 Source: ${src}${p.sources[0].retrieved ? ` <span class="muted">(${p.sources[0].retrieved})</span>` : ""}</p>` : ""}
         <div class="card-actions">
-          <button class="water-btn" data-act="add">+ Add to my garden</button>
+          ${actions}
         </div>
       </article>`;
   }
 
   guideListEl.addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-act='add']");
+    const btn = e.target.closest("button[data-act]");
     if (!btn) return;
     const id = e.target.closest(".card").dataset.id;
-    const gp = DATA.PLANTS.find((p) => p.id === id);
-    if (gp) openDialogFromGuide(gp);
+    const act = btn.getAttribute("data-act");
+    const gp = guidePlants().find((p) => p.id === id);
+    if (!gp) return;
+    if (act === "add") openDialogFromGuide(gp);
+    else if (act === "edit-custom") openGuidePlantDialog(gp);
+    else if (act === "delete-custom") {
+      if (confirm(`Delete custom plant “${gp.name}” from the guide? (Plants already added to My Garden stay.)`)) {
+        customPlants = customPlants.filter((p) => p.id !== id);
+        saveCustomPlants();
+        renderGuide();
+      }
+    }
   });
 
   function openDialogFromGuide(gp) {
@@ -518,17 +545,72 @@
     f.name.value = gp.name;
     f.location.value = "";
     f.planted.value = todayStr();
-    f.interval.value = 3;
+    f.interval.value = gp.waterEveryDays || 3;
     f.sun.value = ["Full sun", "Partial sun", "Shade"].includes(gp.sun) ? gp.sun : "";
     const noteParts = [];
-    noteParts.push(`${gp.crop} (${gp.latin}).`);
+    noteParts.push(gp.latin ? `${gp.crop} (${gp.latin}).` : (gp.crop ? `${gp.crop}.` : ""));
     if (gp.daysToMaturity) noteParts.push(`~${gp.daysToMaturity} days to harvest.`);
     if (gp.spacingIn) noteParts.push(`Space ${gp.spacingIn}" apart.`);
     if (gp.tips) noteParts.push(gp.tips);
     if (gp.sources && gp.sources[0]) noteParts.push(`Source: ${gp.sources[0].name}.`);
-    f.notes.value = noteParts.join(" ");
+    f.notes.value = noteParts.filter(Boolean).join(" ");
     dialog.showModal();
     f.name.focus();
+  }
+
+  // --- custom guide plants (user-defined crops) ---
+  const guidePlantDialog = document.getElementById("guidePlantDialog");
+  const guidePlantForm = document.getElementById("guidePlantForm");
+  const gpf = guidePlantForm ? guidePlantForm.elements : null;
+  const addGuidePlantBtn = document.getElementById("addGuidePlantBtn");
+
+  function openGuidePlantDialog(plant) {
+    if (!guidePlantDialog) return;
+    guidePlantForm.reset();
+    document.getElementById("guidePlantTitle").textContent = plant ? "Edit custom plant" : "Add custom plant";
+    gpf.gpId.value = plant ? plant.id : "";
+    gpf.gpName.value = plant ? plant.name || "" : "";
+    gpf.gpCrop.value = plant ? plant.crop || "" : "";
+    gpf.gpSun.value = plant && ["Full sun", "Partial sun", "Shade"].includes(plant.sun) ? plant.sun : "";
+    gpf.gpSpacing.value = plant && plant.spacingIn ? plant.spacingIn : "";
+    gpf.gpWater.value = plant && plant.waterEveryDays ? plant.waterEveryDays : 3;
+    gpf.gpDays.value = plant && plant.daysToMaturity ? plant.daysToMaturity : "";
+    gpf.gpPerennial.checked = !!(plant && plant.perennial);
+    gpf.gpTips.value = plant ? plant.tips || "" : "";
+    guidePlantDialog.showModal();
+    gpf.gpName.focus();
+  }
+
+  if (addGuidePlantBtn) addGuidePlantBtn.addEventListener("click", () => openGuidePlantDialog(null));
+
+  if (guidePlantForm) {
+    guidePlantForm.addEventListener("submit", (e) => {
+      if (!gpf.gpName.value.trim()) return; // required
+      e.preventDefault();
+      const existing = gpf.gpId.value ? customPlants.find((p) => p.id === gpf.gpId.value) : null;
+      const name = gpf.gpName.value.trim();
+      const num = (v) => { const n = parseFloat(v); return isFinite(n) && n > 0 ? n : null; };
+      const data = {
+        id: existing ? existing.id : "custom-" + uid(),
+        custom: true,
+        name,
+        crop: gpf.gpCrop.value.trim() || name,
+        latin: existing ? existing.latin || "" : "",
+        sun: gpf.gpSun.value,
+        spacingIn: num(gpf.gpSpacing.value),
+        waterEveryDays: num(gpf.gpWater.value),
+        daysToMaturity: num(gpf.gpDays.value),
+        perennial: gpf.gpPerennial.checked,
+        tips: gpf.gpTips.value.trim(),
+        methods: [],
+      };
+      if (existing) Object.assign(existing, data);
+      else customPlants.push(data);
+      saveCustomPlants();
+      renderGuide();
+      guidePlantDialog.close();
+    });
+    guidePlantForm.querySelector("[value='cancel']").addEventListener("click", () => guidePlantDialog.close());
   }
 
   // ===================== Rain-aware watering (opt-in) =====================
@@ -793,7 +875,7 @@
 
   // --- spacing-conflict detection ---
   function guideSpacing(guideId) {
-    const gp = (DATA.PLANTS || []).find((p) => p.id === guideId);
+    const gp = guidePlants().find((p) => p.id === guideId);
     return gp && gp.spacingIn ? gp.spacingIn : null;
   }
   function plantingSpacing(pl) {
@@ -824,7 +906,7 @@
     const groups = (DATA.COMPANIONS && DATA.COMPANIONS.groups) || {};
     let hay = (pl.name || "").toLowerCase();
     if (pl.guideId) {
-      const gp = (DATA.PLANTS || []).find((p) => p.id === pl.guideId);
+      const gp = guidePlants().find((p) => p.id === pl.guideId);
       if (gp) hay += " " + (gp.crop || "").toLowerCase() + " " + (gp.name || "").toLowerCase();
     }
     for (const key in groups) {
@@ -879,11 +961,12 @@
     return "🌱";
   }
   function guideNote(gp) {
-    const parts = [`${gp.crop} (${gp.latin}).`];
+    const parts = [gp.latin ? `${gp.crop} (${gp.latin}).` : (gp.crop ? `${gp.crop}.` : "")];
     if (gp.daysToMaturity) parts.push(`~${gp.daysToMaturity} days to harvest.`);
     if (gp.spacingIn) parts.push(`Space ${gp.spacingIn}" apart.`);
+    if (gp.tips) parts.push(gp.tips);
     if (gp.sources && gp.sources[0]) parts.push(`Source: ${gp.sources[0].name}.`);
-    return parts.join(" ");
+    return parts.filter(Boolean).join(" ");
   }
 
   // --- placement / removal (integrated with My Garden tracker) ---
@@ -1056,7 +1139,7 @@
     chips.push(`<button class="chip ${armedTool.kind === "select" ? "on" : ""}" data-tool="select">✋ Select</button>`);
     chips.push(`<button class="chip ${armedTool.kind === "block" ? "on" : ""}" data-tool="block">🧱 Path/Block</button>`);
     chips.push(`<button class="chip ${armedTool.kind === "plant" && armedTool.meta && !armedTool.meta.guideId ? "on" : ""}" data-tool="custom">✏️ Custom…</button>`);
-    (DATA.PLANTS || []).forEach((gp, i) => {
+    guidePlants().forEach((gp, i) => {
       const on = armedTool.kind === "plant" && armedTool.meta && armedTool.meta.guideId === gp.id;
       chips.push(`<button class="chip ${on ? "on" : ""}" data-tool="plant:${i}">${plantEmoji(gp.name)} ${escapeHtml(gp.name)}</button>`);
     });
@@ -1131,7 +1214,7 @@
       if (!name) return;
       armedTool = { kind: "plant", meta: { name, spacingIn: null, sun: "", guideId: null, note: "Custom plant." } };
     } else if (spec.startsWith("plant:")) {
-      const gp = (DATA.PLANTS || [])[parseInt(spec.slice(6), 10)];
+      const gp = guidePlants()[parseInt(spec.slice(6), 10)];
       if (!gp) return;
       armedTool = { kind: "plant", meta: { name: gp.name, spacingIn: gp.spacingIn, sun: gp.sun, guideId: gp.id, note: guideNote(gp) } };
     }

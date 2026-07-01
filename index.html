@@ -27,7 +27,6 @@
 
   <main id="gardenView">
     <section class="toolbar">
-      <button id="addBtn" class="primary">+ Add plant</button>
       <div class="filters">
         <label for="filter">Show:</label>
         <select id="filter">
@@ -41,7 +40,7 @@
 
     <section id="plantList" class="plant-list" aria-live="polite"></section>
 
-    <p id="emptyState" class="empty">No plants yet. Tap <strong>“Add plant”</strong> to get started. 🪴</p>
+    <p id="emptyState" class="empty">No plants yet. Add one from the <strong>📅 Planting Guide</strong> or place plants in a <strong>🗺️ Bed</strong> to start tracking. 🪴</p>
 
     <section class="backup">
       <h2>Backup</h2>
@@ -108,6 +107,7 @@
           <option value="now">Plant this month</option>
         </select>
       </div>
+      <button id="addGuidePlantBtn" class="primary">+ Add plant</button>
     </section>
 
     <section id="guideList" class="plant-list" aria-live="polite"></section>
@@ -170,6 +170,58 @@
       <menu class="dialog-actions">
         <button type="button" id="cancelBtn" value="cancel">Cancel</button>
         <button type="submit" class="primary" id="saveBtn">Save</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <!-- Add/Edit custom guide plant dialog -->
+  <dialog id="guidePlantDialog">
+    <form id="guidePlantForm" method="dialog">
+      <h2 id="guidePlantTitle">Add custom plant</h2>
+      <input type="hidden" id="gpId" name="gpId" />
+
+      <label>Name *
+        <input type="text" id="gpName" name="gpName" required maxlength="60" placeholder="Basil, Marigold, Sunflower…" />
+      </label>
+
+      <label>Type / category
+        <input type="text" id="gpCrop" name="gpCrop" maxlength="60" placeholder="Herb, Flower, Vegetable…" />
+      </label>
+
+      <label>Sunlight
+        <select id="gpSun" name="gpSun">
+          <option value="">—</option>
+          <option value="Full sun">Full sun</option>
+          <option value="Partial sun">Partial sun</option>
+          <option value="Shade">Shade</option>
+        </select>
+      </label>
+
+      <div class="row">
+        <label>Spacing (inches)
+          <input type="number" id="gpSpacing" name="gpSpacing" min="1" max="120" step="0.5" placeholder="12" />
+        </label>
+        <label>Water every (days)
+          <input type="number" id="gpWater" name="gpWater" min="1" max="365" value="3" />
+        </label>
+      </div>
+
+      <div class="row">
+        <label>Days to harvest
+          <input type="number" id="gpDays" name="gpDays" min="1" max="400" placeholder="optional" />
+        </label>
+        <label class="bed-check">
+          <input type="checkbox" id="gpPerennial" name="gpPerennial" /> Perennial
+        </label>
+      </div>
+
+      <label>Tips / notes
+        <textarea id="gpTips" name="gpTips" rows="3" maxlength="500" placeholder="Growing tips, variety, care notes…"></textarea>
+      </label>
+
+      <menu class="dialog-actions">
+        <button type="button" value="cancel">Cancel</button>
+        <button type="submit" class="primary">Save</button>
       </menu>
     </form>
   </dialog>
