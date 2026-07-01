@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#2e7d32" />
+  <title>Garden Planner</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Garden" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>🌱 Garden Planner</h1>
+    <p class="tagline">Private &amp; offline — your data never leaves this device.</p>
+  </header>
+
+  <main>
+    <section class="toolbar">
+      <button id="addBtn" class="primary">+ Add plant</button>
+      <div class="filters">
+        <label for="filter">Show:</label>
+        <select id="filter">
+          <option value="all">All plants</option>
+          <option value="thirsty">Needs water</option>
+        </select>
+      </div>
+    </section>
+
+    <section id="summary" class="summary" hidden></section>
+
+    <section id="plantList" class="plant-list" aria-live="polite"></section>
+
+    <p id="emptyState" class="empty">No plants yet. Tap <strong>“Add plant”</strong> to get started. 🪴</p>
+
+    <section class="backup">
+      <h2>Backup</h2>
+      <p class="muted">Save or restore your garden data as a file. Nothing is uploaded anywhere.</p>
+      <div class="backup-actions">
+        <button id="exportBtn">⬇︎ Export backup</button>
+        <button id="importBtn">⬆︎ Import backup</button>
+        <input type="file" id="importFile" accept="application/json" hidden />
+      </div>
+    </section>
+  </main>
+
+  <!-- Add/Edit dialog -->
+  <dialog id="plantDialog">
+    <form id="plantForm" method="dialog">
+      <h2 id="dialogTitle">Add plant</h2>
+      <input type="hidden" id="plantId" />
+
+      <label>Name *
+        <input type="text" id="name" required maxlength="60" placeholder="Tomato, Basil, Rose…" />
+      </label>
+
+      <label>Location / bed
+        <input type="text" id="location" maxlength="60" placeholder="Back bed, Pot 3, Balcony…" />
+      </label>
+
+      <div class="row">
+        <label>Planted on
+          <input type="date" id="planted" />
+        </label>
+        <label>Water every (days)
+          <input type="number" id="interval" min="1" max="365" value="3" />
+        </label>
+      </div>
+
+      <label>Sunlight
+        <select id="sun">
+          <option value="">—</option>
+          <option value="Full sun">Full sun</option>
+          <option value="Partial sun">Partial sun</option>
+          <option value="Shade">Shade</option>
+        </select>
+      </label>
+
+      <label>Notes
+        <textarea id="notes" rows="3" maxlength="500" placeholder="Variety, care tips, observations…"></textarea>
+      </label>
+
+      <menu class="dialog-actions">
+        <button type="button" id="cancelBtn" value="cancel">Cancel</button>
+        <button type="submit" class="primary" id="saveBtn">Save</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
