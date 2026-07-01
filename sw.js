@@ -1,5 +1,5 @@
 // Service worker: cache app shell for offline use.
-const CACHE = "garden-v5";
+const CACHE = "garden-v6";
 const ASSETS = [
   "./",
   "./index.html",
@@ -29,6 +29,8 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  // Never cache weather/geocoding API calls — always go to network.
+  if (/(?:api|geocoding-api)\.open-meteo\.com/.test(event.request.url)) return;
   event.respondWith(
     caches.match(event.request).then((cached) =>
       cached ||

@@ -5,6 +5,37 @@
   const STORAGE_KEY = "garden.plants.v1";
   const MS_PER_DAY = 86400000;
 
+  // --- Rain-aware watering (opt-in) ---
+  const RAIN_ENABLED_KEY = "garden.rain.enabled";
+  const RAIN_LOC_KEY = "garden.location.v1";
+  const RAIN_WX_KEY = "garden.weather.v1";
+  const RAIN_THRESHOLD_IN = 0.25;   // rainfall (inches) that counts as a watering
+  const RAIN_WINDOW_DAYS = 8;        // how far back rain can "reset" the schedule
+  let rainEnabled = localStorage.getItem(RAIN_ENABLED_KEY) === "1";
+  let rainLoc = loadJson(RAIN_LOC_KEY, null);      // { lat, lon, label }
+  let weather = loadJson(RAIN_WX_KEY, null);        // { fetchedAt, byDate:{date:inches} }
+
+  function loadJson(key, fallback) {
+    try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : fallback; }
+    catch (e) { return fallback; }
+  }
+
+  /** Most recent past/today date (YYYY-MM-DD) with significant rain, else null. */
+  function lastSignificantRain() {
+    if (!rainEnabled || !weather || !weather.byDate) return null;
+    const today = todayStr();
+    const cutoff = localDateStr(new Date(Date.now() - RAIN_WINDOW_DAYS * MS_PER_DAY));
+    let best = null;
+    for (const [date, inches] of Object.entries(weather.byDate)) {
+      if (date > today || date < cutoff) continue;
+      if (inches >= RAIN_THRESHOLD_IN && (!best || date > best.date)) {
+        best = { date, inches };
+      }
+    }
+    return best;
+  }
+
+
   /** @type {Array} */
   let plants = load();
 
@@ -43,11 +74,30 @@
 
   // --- Helpers ---
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  const todayStr = () => new Date().toISOString().slice(0, 10);
+  function localDateStr(d = new Date()) {
+    const t = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    return t.toISOString().slice(0, 10);
+  }
+  const todayStr = () => localDateStr();
+  function parseLocalDate(str) {
+    const [y, m, d] = str.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  // Effective "last watered" anchor — rain more recent than the last manual
+  // watering (or planting) resets the schedule.
+  function effectiveWaterBase(p) {
+    const baseStr = p.lastWatered || p.planted || todayStr();
+    let date = baseStr, fromRain = false;
+    const rain = lastSignificantRain();
+    if (rain && rain.date > date) { date = rain.date; fromRain = true; }
+    return { date, fromRain, rain };
+  }
 
   function daysUntilWater(p) {
     if (!p.interval) return null;
-    const last = p.lastWatered ? new Date(p.lastWatered) : (p.planted ? new Date(p.planted) : new Date());
+    const base = effectiveWaterBase(p);
+    const last = parseLocalDate(base.date);
     const due = new Date(last.getTime() + p.interval * MS_PER_DAY);
     const now = new Date();
     return Math.floor((due.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0)) / MS_PER_DAY);
@@ -64,7 +114,7 @@
 
   function fmtDate(str) {
     if (!str) return null;
-    const d = new Date(str);
+    const d = parseLocalDate(str);
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   }
 
@@ -76,6 +126,7 @@
 
   // --- Rendering ---
   function render() {
+    renderWeatherPanel();
     const filter = filterEl.value;
     const sorted = [...plants].sort((a, b) => {
       const da = daysUntilWater(a), db = daysUntilWater(b);
@@ -107,12 +158,17 @@
 
   function cardHtml(p) {
     const st = waterStatus(p);
+    const base = effectiveWaterBase(p);
     const meta = [];
     if (p.location) meta.push(`<span>📍 ${escapeHtml(p.location)}</span>`);
     if (p.sun) meta.push(`<span>☀️ ${escapeHtml(p.sun)}</span>`);
     if (p.planted) meta.push(`<span>🌱 Planted ${fmtDate(p.planted)}</span>`);
     if (p.lastWatered) meta.push(`<span>💧 Watered ${fmtDate(p.lastWatered)}</span>`);
     if (p.interval) meta.push(`<span>🔁 Every ${p.interval}d</span>`);
+
+    const rainNote = (base.fromRain && p.interval)
+      ? `<p class="rain-note">🌧️ Counting ${base.rain.inches.toFixed(2)}″ rain on ${fmtDate(base.rain.date)} as a watering.</p>`
+      : "";
 
     return `
       <article class="card ${st.cls}" data-id="${p.id}">
@@ -121,6 +177,7 @@
           <span class="badge ${st.badge}">${st.label}</span>
         </div>
         ${meta.length ? `<p class="meta">${meta.join("")}</p>` : ""}
+        ${rainNote}
         ${p.notes ? `<p class="notes">${escapeHtml(p.notes)}</p>` : ""}
         <div class="card-actions">
           <button class="water-btn" data-act="water">💧 Water now</button>
@@ -448,6 +505,188 @@
     f.notes.value = noteParts.join(" ");
     dialog.showModal();
     f.name.focus();
+  }
+
+  // ===================== Rain-aware watering (opt-in) =====================
+  const weatherPanelEl = document.getElementById("weatherPanel");
+  let wxBusy = false;
+  let wxError = "";
+
+  function persistRain() {
+    localStorage.setItem(RAIN_ENABLED_KEY, rainEnabled ? "1" : "0");
+    if (rainLoc) localStorage.setItem(RAIN_LOC_KEY, JSON.stringify(rainLoc));
+    else localStorage.removeItem(RAIN_LOC_KEY);
+    if (weather) localStorage.setItem(RAIN_WX_KEY, JSON.stringify(weather));
+    else localStorage.removeItem(RAIN_WX_KEY);
+  }
+
+  function round2(n) { return Math.round(n * 100) / 100; }
+
+  function recentRainTotal() {
+    if (!weather || !weather.byDate) return 0;
+    const today = todayStr();
+    const cutoff = localDateStr(new Date(Date.now() - 7 * MS_PER_DAY));
+    let sum = 0;
+    for (const [date, inches] of Object.entries(weather.byDate)) {
+      if (date <= today && date >= cutoff) sum += inches;
+    }
+    return sum;
+  }
+
+  function forecastTomorrow() {
+    if (!weather || !weather.byDate) return null;
+    const tmr = localDateStr(new Date(Date.now() + MS_PER_DAY));
+    return tmr in weather.byDate ? weather.byDate[tmr] : null;
+  }
+
+  async function fetchWeather() {
+    if (!rainLoc) return;
+    wxBusy = true; wxError = ""; renderWeatherPanel();
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${rainLoc.lat}` +
+        `&longitude=${rainLoc.lon}&daily=precipitation_sum&past_days=7&forecast_days=2` +
+        `&precipitation_unit=inch&timezone=auto`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Weather service error " + res.status);
+      const data = await res.json();
+      const byDate = {};
+      const t = data.daily.time, v = data.daily.precipitation_sum;
+      for (let i = 0; i < t.length; i++) byDate[t[i]] = v[i] == null ? 0 : v[i];
+      weather = { fetchedAt: Date.now(), byDate };
+      persistRain();
+    } catch (e) {
+      wxError = e.message || "Couldn't fetch weather.";
+    } finally {
+      wxBusy = false;
+      render();
+    }
+  }
+
+  function useGPS() {
+    if (!navigator.geolocation) { wxError = "Location isn't available on this device."; renderWeatherPanel(); return; }
+    wxBusy = true; wxError = ""; renderWeatherPanel();
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = round2(pos.coords.latitude), lon = round2(pos.coords.longitude);
+        rainLoc = { lat, lon, label: `Your area (~${lat}, ${lon})` };
+        persistRain();
+        fetchWeather();
+      },
+      (err) => {
+        wxBusy = false;
+        wxError = err.code === 1
+          ? "Location permission denied. You can enter a town/city instead."
+          : "Couldn't get your location. Try entering a town/city.";
+        renderWeatherPanel();
+      },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 600000 }
+    );
+  }
+
+  async function useCity() {
+    const name = prompt("Enter a town or city (optionally add state/country):");
+    if (!name || !name.trim()) return;
+    wxBusy = true; wxError = ""; renderWeatherPanel();
+    try {
+      const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name.trim())}&count=1`);
+      const data = await res.json();
+      if (!data.results || !data.results.length) throw new Error("No place found for “" + name.trim() + "”.");
+      const r = data.results[0];
+      const parts = [r.name, r.admin1, r.country_code].filter(Boolean).join(", ");
+      rainLoc = { lat: round2(r.latitude), lon: round2(r.longitude), label: parts };
+      persistRain();
+      fetchWeather();
+    } catch (e) {
+      wxBusy = false;
+      wxError = e.message || "Couldn't find that place.";
+      renderWeatherPanel();
+    }
+  }
+
+  function enableRain() {
+    rainEnabled = true; persistRain();
+    if (!rainLoc) useGPS(); else { renderWeatherPanel(); if (!weather) fetchWeather(); }
+  }
+  function disableRain() {
+    rainEnabled = false; rainLoc = null; weather = null; wxError = "";
+    persistRain();
+    render();
+  }
+
+  function fmtFetched(ts) {
+    if (!ts) return "";
+    return new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+
+  function renderWeatherPanel() {
+    if (!weatherPanelEl) return;
+    let html;
+
+    if (!rainEnabled) {
+      html = `
+        <div class="wx-off">
+          <div>
+            <strong>🌧️ Rain-aware watering</strong>
+            <p class="muted">Optional. Uses recent rainfall near you (via Open-Meteo) so plants aren't marked thirsty right after it rains. Sends only your approximate location — off by default.</p>
+          </div>
+          <button class="primary" data-wx="enable">Turn on</button>
+        </div>`;
+    } else if (wxBusy) {
+      html = `<div class="wx-on"><span>⏳ Getting weather…</span> <button data-wx="off">Turn off</button></div>`;
+    } else if (!rainLoc) {
+      html = `
+        <div class="wx-on">
+          <div class="wx-line"><strong>🌧️ Rain-aware watering is on</strong>
+          <p class="muted">Set your location to check rainfall:</p></div>
+          <div class="wx-actions">
+            <button class="primary" data-wx="gps">📍 Use my location</button>
+            <button data-wx="city">Enter town/city</button>
+            <button data-wx="off">Turn off</button>
+          </div>
+          ${wxError ? `<p class="wx-error">${escapeHtml(wxError)}</p>` : ""}
+        </div>`;
+    } else {
+      const recent = recentRainTotal();
+      const sig = lastSignificantRain();
+      const tmr = forecastTomorrow();
+      html = `
+        <div class="wx-on">
+          <div class="wx-line">
+            <strong>🌧️ ${recent.toFixed(2)}″ rain in last 7 days</strong>
+            <span class="muted">· ${escapeHtml(rainLoc.label)}</span>
+          </div>
+          <p class="muted wx-detail">
+            ${sig ? `Last significant rain: ${fmtDate(sig.date)} (${sig.inches.toFixed(2)}″), counted as a watering.` : `No significant rain (≥${RAIN_THRESHOLD_IN}″) recently.`}
+            ${tmr != null ? ` · Tomorrow: ${tmr.toFixed(2)}″ forecast.` : ""}
+          </p>
+          <div class="wx-actions">
+            <button data-wx="refresh">↻ Refresh</button>
+            <button data-wx="gps">📍 Update location</button>
+            <button data-wx="city">Change town/city</button>
+            <button data-wx="off">Turn off</button>
+          </div>
+          ${wxError ? `<p class="wx-error">${escapeHtml(wxError)}</p>` : ""}
+          <p class="wx-attrib muted">Updated ${fmtFetched(weather && weather.fetchedAt)} · Weather by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a></p>
+        </div>`;
+    }
+    weatherPanelEl.innerHTML = html;
+  }
+
+  weatherPanelEl && weatherPanelEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-wx]");
+    if (!btn) return;
+    const act = btn.dataset.wx;
+    if (act === "enable") enableRain();
+    else if (act === "off") disableRain();
+    else if (act === "gps") useGPS();
+    else if (act === "city") useCity();
+    else if (act === "refresh") fetchWeather();
+  });
+
+  // Refresh weather in the background on load if enabled and stale (>3h).
+  if (rainEnabled && rainLoc) {
+    const stale = !weather || (Date.now() - (weather.fetchedAt || 0)) > 3 * 3600 * 1000;
+    if (stale && navigator.onLine) fetchWeather();
   }
 
   render();
