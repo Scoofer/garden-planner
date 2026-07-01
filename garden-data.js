@@ -4,9 +4,11 @@
 window.GARDEN_DATA = (function () {
   "use strict";
 
-  // Approx last spring frost / first fall frost per USDA zone (month is 1-12, day).
-  // General references; adjust to your local microclimate.
-  const ZONE_FROST = {
+  // Approx last spring frost / first fall frost per USDA zone (month 1-12, day).
+  // Each full zone is split into 'a' (colder half) and 'b' (warmer half); a half-zone
+  // is ~5°F, roughly a one-week shift in frost dates. General references — adjust to
+  // your local microclimate.
+  const ZONE_MIDPOINTS = {
     "1":  { lastFrost: [6, 15], firstFall: [8, 15] },
     "2":  { lastFrost: [5, 20], firstFall: [9, 10] },
     "3":  { lastFrost: [5, 15], firstFall: [9, 15] },
@@ -21,6 +23,33 @@ window.GARDEN_DATA = (function () {
     "12": { frostFree: true },
     "13": { frostFree: true },
   };
+
+  const HALF_SHIFT_DAYS = 7; // ~one week per half-zone
+  function shiftMD(md, days) {
+    const d = new Date(2025, md[0] - 1, md[1] + days);
+    return [d.getMonth() + 1, d.getDate()];
+  }
+  // Build a/b (and plain-number, for backward compatibility) entries.
+  const ZONE_FROST = {};
+  Object.keys(ZONE_MIDPOINTS).forEach((z) => {
+    const base = ZONE_MIDPOINTS[z];
+    ZONE_FROST[z] = base;
+    if (base.frostFree) {
+      ZONE_FROST[z + "a"] = { frostFree: true };
+      ZONE_FROST[z + "b"] = { frostFree: true };
+    } else {
+      // 'a' = colder: later spring frost, earlier fall frost (shorter season).
+      ZONE_FROST[z + "a"] = {
+        lastFrost: shiftMD(base.lastFrost, HALF_SHIFT_DAYS),
+        firstFall: shiftMD(base.firstFall, -HALF_SHIFT_DAYS),
+      };
+      // 'b' = warmer: earlier spring frost, later fall frost (longer season).
+      ZONE_FROST[z + "b"] = {
+        lastFrost: shiftMD(base.lastFrost, -HALF_SHIFT_DAYS),
+        firstFall: shiftMD(base.firstFall, HALF_SHIFT_DAYS),
+      };
+    }
+  });
 
   const ANNIES = {
     name: "Annie's Heirloom Seeds",

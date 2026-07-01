@@ -1,5 +1,5 @@
 // Service worker: cache app shell for offline use.
-const CACHE = "garden-v2";
+const CACHE = "garden-v3";
 const ASSETS = [
   "./",
   "./index.html",
