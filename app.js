@@ -260,6 +260,17 @@
   document.getElementById("addBtn").addEventListener("click", () => openDialog(null));
   filterEl.addEventListener("change", render);
 
+  // --- Settings dialog ---
+  const settingsDialog = document.getElementById("settingsDialog");
+  document.getElementById("settingsBtn").addEventListener("click", () => {
+    renderWeatherPanel();
+    settingsDialog.showModal();
+  });
+  document.getElementById("settingsCloseBtn").addEventListener("click", () => settingsDialog.close());
+  settingsDialog.addEventListener("click", (e) => {
+    if (e.target === settingsDialog) settingsDialog.close();
+  });
+
   // --- Backup: export / import ---
   document.getElementById("exportBtn").addEventListener("click", () => {
     const blob = new Blob([JSON.stringify(plants, null, 2)], { type: "application/json" });

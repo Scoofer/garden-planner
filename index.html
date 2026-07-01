@@ -15,6 +15,7 @@
 </head>
 <body>
   <header class="app-header">
+    <button id="settingsBtn" class="icon-btn" type="button" aria-label="Settings" title="Settings">⚙︎</button>
     <h1>🌱 Garden Planner</h1>
     <p class="tagline">Private &amp; offline — your data never leaves this device.</p>
   </header>
@@ -35,8 +36,6 @@
         </select>
       </div>
     </section>
-
-    <section id="weatherPanel" class="weather-panel"></section>
 
     <section id="summary" class="summary" hidden></section>
 
@@ -114,6 +113,19 @@
     <section id="guideList" class="plant-list" aria-live="polite"></section>
     <p id="guideEmpty" class="empty" hidden></p>
   </main>
+
+  <!-- Settings dialog -->
+  <dialog id="settingsDialog">
+    <div class="settings-body">
+      <div class="settings-head">
+        <h2>⚙︎ Settings</h2>
+        <button type="button" id="settingsCloseBtn" class="icon-btn dark" aria-label="Close settings">✕</button>
+      </div>
+      <section class="settings-section">
+        <section id="weatherPanel" class="weather-panel"></section>
+      </section>
+    </div>
+  </dialog>
 
   <!-- Add/Edit dialog -->
   <dialog id="plantDialog">
