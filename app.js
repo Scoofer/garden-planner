@@ -988,7 +988,7 @@
       const cap = g.w > 1 || g.h > 1 ? `spans ${g.w}×${g.h} squares` : `fits up to ${g.qty} per square`;
       return `Placing ${escapeHtml(armedTool.meta.name)} (${cap}) — tap a square.`;
     }
-    return "Tap a plant to edit it. Pick a plant below to place it, or use 🧱 to add paths.";
+    return "Tap a plant to edit it, or drag it to move. Pick a plant below to place it, or use 🧱 to add paths.";
   }
 
   function renderBedEditor(b) {
@@ -1065,6 +1065,7 @@
   }
 
   bedsRoot.addEventListener("click", (e) => {
+    if (suppressClick) { suppressClick = false; return; }
     const open = e.target.closest("[data-bed-open]");
     if (open) { currentBedId = open.getAttribute("data-bed-open"); armedTool = { kind: "select" }; renderBeds(); return; }
     const act = e.target.closest("[data-bed-act]");
@@ -1078,6 +1079,82 @@
     const cell = e.target.closest("[data-col]");
     if (cell) { onCellTap(+cell.getAttribute("data-col"), +cell.getAttribute("data-row")); return; }
   });
+
+  // --- drag to move a planting ---
+  let drag = null;
+  let suppressClick = false;
+  function bedSvgEl() { return bedsRoot.querySelector(".bed-svg"); }
+  function bedOffset(b) { return (b.shape === "rect" && b.border) ? 0.5 : 0; }
+  function clientToCell(svg, b, clientX, clientY) {
+    const m = svg.getScreenCTM && svg.getScreenCTM();
+    if (!m) return null;
+    const pt = svg.createSVGPoint(); pt.x = clientX; pt.y = clientY;
+    const loc = pt.matrixTransform(m.inverse());
+    const off = bedOffset(b);
+    return { c: Math.floor(loc.x - off), r: Math.floor(loc.y - off) };
+  }
+  // Clamp a raw target to a valid in-bounds drop; report whether footprint is clear.
+  function computeDrop(b, pl, rawC, rawR) {
+    const w = pl.wCells || 1, h = pl.hCells || 1;
+    const c = Math.max(0, Math.min(bedCols(b) - w, rawC));
+    const r = Math.max(0, Math.min(bedRows(b) - h, rawR));
+    return { c, r, valid: footprintClearExcept(b, c, r, w, h, pl.id) };
+  }
+  bedsRoot.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const b = currentBed(); if (!b) return;
+    const g = e.target.closest("[data-planting]");
+    if (!g) return;
+    const id = g.getAttribute("data-planting");
+    const pl = (b.plantings || []).find((x) => x.id === id);
+    if (!pl) return;
+    const svg = bedSvgEl(); if (!svg) return;
+    const cell = clientToCell(svg, b, e.clientX, e.clientY);
+    drag = {
+      id, el: g, b,
+      grabC: cell ? cell.c - pl.col : 0,
+      grabR: cell ? cell.r - pl.row : 0,
+      origC: pl.col, origR: pl.row,
+      lastC: pl.col, lastR: pl.row,
+      moved: false, valid: true,
+      startX: e.clientX, startY: e.clientY, pointerId: e.pointerId,
+    };
+    try { g.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  bedsRoot.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+    drag.moved = true;
+    const b = drag.b;
+    const svg = bedSvgEl(); if (!svg) return;
+    const cell = clientToCell(svg, b, e.clientX, e.clientY);
+    if (!cell) return;
+    const pl = (b.plantings || []).find((x) => x.id === drag.id); if (!pl) return;
+    const drop = computeDrop(b, pl, cell.c - drag.grabC, cell.r - drag.grabR);
+    drag.lastC = drop.c; drag.lastR = drop.r; drag.valid = drop.valid;
+    drag.el.setAttribute("transform", `translate(${drop.c - drag.origC}, ${drop.r - drag.origR})`);
+    drag.el.setAttribute("opacity", "0.8");
+    const tile = drag.el.querySelector("rect");
+    if (tile) tile.setAttribute("stroke", drop.valid ? "#2f7d32" : "#c62828");
+    e.preventDefault();
+  });
+  function endDrag(e) {
+    if (!drag || (e.pointerId != null && e.pointerId !== drag.pointerId)) return;
+    const d = drag; drag = null;
+    try { d.el.releasePointerCapture(e.pointerId); } catch (err) {}
+    if (!d.moved) return; // treated as a tap → let the click open the dialog
+    suppressClick = true;
+    const b = d.b;
+    const pl = (b.plantings || []).find((x) => x.id === d.id);
+    if (pl && d.valid && (d.lastC !== d.origC || d.lastR !== d.origR)) {
+      pl.col = d.lastC; pl.row = d.lastR;
+      saveBeds();
+    }
+    renderBedEditor(b);
+  }
+  bedsRoot.addEventListener("pointerup", endDrag);
+  bedsRoot.addEventListener("pointercancel", endDrag);
 
   function handleBedAct(a) {
     const b = currentBed();
