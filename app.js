@@ -790,6 +790,33 @@
     return true;
   }
 
+  // --- spacing-conflict detection ---
+  function guideSpacing(guideId) {
+    const gp = (DATA.PLANTS || []).find((p) => p.id === guideId);
+    return gp && gp.spacingIn ? gp.spacingIn : null;
+  }
+  function plantingSpacing(pl) {
+    if (pl.spacingIn) return pl.spacingIn;
+    if (pl.guideId) { const s = guideSpacing(pl.guideId); if (s) return s; }
+    return CELL_IN; // custom / unknown → assume 1 sq ft
+  }
+  // Flag pairs of plantings placed closer (center-to-center) than their combined
+  // spacing recommends. Small square-foot plants (need <= 12") are never flagged.
+  function bedConflicts(b) {
+    const pls = b.plantings || [];
+    const out = [];
+    for (let i = 0; i < pls.length; i++) for (let j = i + 1; j < pls.length; j++) {
+      const A = pls[i], B = pls[j];
+      const need = (plantingSpacing(A) + plantingSpacing(B)) / 2;
+      if (need <= CELL_IN) continue;
+      const ax = A.col + (A.wCells || 1) / 2, ay = A.row + (A.hCells || 1) / 2;
+      const bx = B.col + (B.wCells || 1) / 2, by = B.row + (B.hCells || 1) / 2;
+      const have = Math.hypot(ax - bx, ay - by) * CELL_IN;
+      if (have + 1e-6 < need) out.push({ a: A, b: B, need, have });
+    }
+    return out;
+  }
+
   function plantEmoji(name) {
     const n = (name || "").toLowerCase();
     const map = [
@@ -830,7 +857,8 @@
     b.plantings = b.plantings || [];
     b.plantings.push({
       id: plant.id, col, row, wCells: g.w, hCells: g.h,
-      name: meta.name, guideId: meta.guideId || null, qty: 1, emoji: plantEmoji(meta.name),
+      name: meta.name, guideId: meta.guideId || null, qty: 1,
+      spacingIn: meta.spacingIn || null, emoji: plantEmoji(meta.name),
     });
     save(); saveBeds();
     return true;
@@ -867,9 +895,10 @@
   }
 
   // --- SVG grid ---
-  function buildBedSvg(b, interactive) {
+  function buildBedSvg(b, interactive, conflictIds) {
     const cols = bedCols(b), rows = bedRows(b);
     const blocked = new Set(b.blocked || []);
+    const conflicts = conflictIds || new Set();
     const rect = b.shape === "rect";
     const rounded = rect && b.rounded;
     const off = rect && b.border ? 0.5 : 0; // 6" inset border = half a 12" cell
@@ -904,6 +933,8 @@
       p.push(`<rect x="${x0 + 0.07}" y="${y0 + 0.07}" width="${w - 0.14}" height="${h - 0.14}" rx="0.12" fill="#e5f2df" stroke="#5a9247" stroke-width="0.05" vector-effect="non-scaling-stroke"></rect>`);
       p.push(`<text x="${x0 + w / 2}" y="${y0 + h / 2}" text-anchor="middle" dy="0.35em" font-size="${Math.min(w, h) * 0.52}">${pl.emoji || "🌱"}</text>`);
       if (pl.qty > 1) p.push(`<text x="${x0 + w - 0.12}" y="${y0 + h - 0.14}" text-anchor="end" dominant-baseline="central" font-size="0.24" fill="#3a5a2c">×${pl.qty}</text>`);
+      if (conflicts.has(pl.id)) p.push(`<rect x="${x0 + 0.02}" y="${y0 + 0.02}" width="${w - 0.04}" height="${h - 0.04}" rx="0.14" fill="none" stroke="#e6893a" stroke-width="0.08" stroke-dasharray="0.16 0.12" vector-effect="non-scaling-stroke" pointer-events="none"></rect>`);
+      if (interactive) p.push(`<rect class="pl-handle" data-resize-planting="${pl.id}" x="${x0 + w - 0.3}" y="${y0 + h - 0.3}" width="0.28" height="0.28" rx="0.06" fill="#5a9247" stroke="#ffffff" stroke-width="0.035" vector-effect="non-scaling-stroke"></rect>`);
       p.push(`</g>`);
     });
     if (needClip) p.push(`</g>`);
@@ -913,6 +944,9 @@
     }
     if (rounded && off === 0) {
       p.push(`<rect x="0" y="0" width="${cols}" height="${rows}" rx="${rx}" ry="${rx}" fill="none" stroke="#8fb37d" stroke-width="0.08" vector-effect="non-scaling-stroke"></rect>`);
+    }
+    if (interactive) {
+      p.push(`<rect id="dragPreview" x="0" y="0" width="0" height="0" rx="0.12" fill="none" stroke="#2f7d32" stroke-width="0.09" stroke-dasharray="0.18 0.12" vector-effect="non-scaling-stroke" visibility="hidden" pointer-events="none"></rect>`);
     }
     p.push(`</svg>`);
     return p.join("");
@@ -993,6 +1027,12 @@
 
   function renderBedEditor(b) {
     const s = bedStats(b);
+    const conflicts = bedConflicts(b);
+    const conflictIds = new Set();
+    conflicts.forEach((c) => { conflictIds.add(c.a.id); conflictIds.add(c.b.id); });
+    const warnHtml = conflicts.length
+      ? `<div class="bed-warn">⚠️ ${conflicts.length} spacing conflict${conflicts.length > 1 ? "s" : ""}: ${conflicts.slice(0, 3).map((c) => `${escapeHtml(c.a.name)} &amp; ${escapeHtml(c.b.name)} (need ~${Math.round(c.need)}″, have ${Math.round(c.have)}″)`).join("; ")}${conflicts.length > 3 ? "…" : ""}</div>`
+      : "";
     const resize = b.shape === "circle"
       ? `<div class="resize-group"><span>Diameter</span><button data-resize="d-">−</button><b>${b.diameterFt} ft</b><button data-resize="d+">+</button></div>`
       : `<div class="resize-group"><span>Width</span><button data-resize="w-">−</button><b>${b.widthFt} ft</b><button data-resize="w+">+</button></div>
@@ -1012,7 +1052,8 @@
       <div class="bed-resize">${resize}</div>
       <div class="bed-palette">${paletteHtml()}</div>
       <p class="bed-hint">${toolHint(b)}</p>
-      <div class="bed-grid-wrap">${buildBedSvg(b, true)}</div>
+      ${warnHtml}
+      <div class="bed-grid-wrap">${buildBedSvg(b, true, conflictIds)}</div>
       <p class="bed-summary muted">🟩 ${s.used}/${s.usable} squares used · 🌱 ${s.plantings} planting${s.plantings === 1 ? "" : "s"}${s.blocked ? ` · 🧱 ${s.blocked} path` : ""}</p>`;
   }
 
@@ -1103,6 +1144,7 @@
   bedsRoot.addEventListener("pointerdown", (e) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const b = currentBed(); if (!b) return;
+    const handle = e.target.closest("[data-resize-planting]");
     const g = e.target.closest("[data-planting]");
     if (!g) return;
     const id = g.getAttribute("data-planting");
@@ -1111,11 +1153,13 @@
     const svg = bedSvgEl(); if (!svg) return;
     const cell = clientToCell(svg, b, e.clientX, e.clientY);
     drag = {
+      mode: handle ? "resize" : "move",
       id, el: g, b,
       grabC: cell ? cell.c - pl.col : 0,
       grabR: cell ? cell.r - pl.row : 0,
       origC: pl.col, origR: pl.row,
-      lastC: pl.col, lastR: pl.row,
+      origW: pl.wCells || 1, origH: pl.hCells || 1,
+      lastC: pl.col, lastR: pl.row, lastW: pl.wCells || 1, lastH: pl.hCells || 1,
       moved: false, valid: true,
       startX: e.clientX, startY: e.clientY, pointerId: e.pointerId,
     };
@@ -1131,12 +1175,30 @@
     const cell = clientToCell(svg, b, e.clientX, e.clientY);
     if (!cell) return;
     const pl = (b.plantings || []).find((x) => x.id === drag.id); if (!pl) return;
-    const drop = computeDrop(b, pl, cell.c - drag.grabC, cell.r - drag.grabR);
-    drag.lastC = drop.c; drag.lastR = drop.r; drag.valid = drop.valid;
-    drag.el.setAttribute("transform", `translate(${drop.c - drag.origC}, ${drop.r - drag.origR})`);
-    drag.el.setAttribute("opacity", "0.8");
-    const tile = drag.el.querySelector("rect");
-    if (tile) tile.setAttribute("stroke", drop.valid ? "#2f7d32" : "#c62828");
+    const off = bedOffset(b);
+    if (drag.mode === "resize") {
+      let w = Math.max(1, Math.min(bedCols(b) - drag.origC, cell.c - drag.origC + 1));
+      let h = Math.max(1, Math.min(bedRows(b) - drag.origR, cell.r - drag.origR + 1));
+      drag.lastW = w; drag.lastH = h;
+      drag.valid = footprintClearExcept(b, drag.origC, drag.origR, w, h, drag.id);
+      const prev = svg.querySelector("#dragPreview");
+      if (prev) {
+        prev.setAttribute("x", off + drag.origC + 0.03);
+        prev.setAttribute("y", off + drag.origR + 0.03);
+        prev.setAttribute("width", w - 0.06);
+        prev.setAttribute("height", h - 0.06);
+        prev.setAttribute("stroke", drag.valid ? "#2f7d32" : "#c62828");
+        prev.setAttribute("visibility", "visible");
+      }
+      drag.el.setAttribute("opacity", "0.6");
+    } else {
+      const drop = computeDrop(b, pl, cell.c - drag.grabC, cell.r - drag.grabR);
+      drag.lastC = drop.c; drag.lastR = drop.r; drag.valid = drop.valid;
+      drag.el.setAttribute("transform", `translate(${drop.c - drag.origC}, ${drop.r - drag.origR})`);
+      drag.el.setAttribute("opacity", "0.8");
+      const tile = drag.el.querySelector("rect");
+      if (tile) tile.setAttribute("stroke", drop.valid ? "#2f7d32" : "#c62828");
+    }
     e.preventDefault();
   });
   function endDrag(e) {
@@ -1147,9 +1209,12 @@
     suppressClick = true;
     const b = d.b;
     const pl = (b.plantings || []).find((x) => x.id === d.id);
-    if (pl && d.valid && (d.lastC !== d.origC || d.lastR !== d.origR)) {
-      pl.col = d.lastC; pl.row = d.lastR;
-      saveBeds();
+    if (pl && d.valid) {
+      if (d.mode === "resize" && (d.lastW !== d.origW || d.lastH !== d.origH)) {
+        pl.wCells = d.lastW; pl.hCells = d.lastH; saveBeds();
+      } else if (d.mode === "move" && (d.lastC !== d.origC || d.lastR !== d.origR)) {
+        pl.col = d.lastC; pl.row = d.lastR; saveBeds();
+      }
     }
     renderBedEditor(b);
   }
