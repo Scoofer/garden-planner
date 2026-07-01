@@ -156,6 +156,8 @@ select, input, textarea {
 }
 .zone-bar label { display: grid; gap: 0.35rem; font-size: 0.9rem; }
 .zone-display { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.95rem; }
+.zone-display-info { display: grid; gap: 0.15rem; }
+.zone-frost { font-size: 0.8rem; color: var(--muted); }
 .zone-display strong { color: var(--green-dark); font-size: 1.05rem; }
 .zone-display button { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
 #zoneHint { margin: 0.5rem 0 0; }

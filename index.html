@@ -56,7 +56,10 @@
   <main id="guideView" hidden>
     <section class="zone-bar">
       <div id="zoneDisplay" class="zone-display" hidden>
-        <span>🌡️ Your zone: <strong id="zoneCurrent"></strong></span>
+        <div class="zone-display-info">
+          <span>🌡️ Your zone: <strong id="zoneCurrent"></strong></span>
+          <span class="zone-frost" id="zoneFrost"></span>
+        </div>
         <button id="changeZoneBtn" type="button">Change</button>
       </div>
       <div id="zoneEdit">

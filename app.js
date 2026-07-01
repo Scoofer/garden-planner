@@ -258,6 +258,7 @@
   const zoneDisplay = document.getElementById("zoneDisplay");
   const zoneEdit = document.getElementById("zoneEdit");
   const zoneCurrent = document.getElementById("zoneCurrent");
+  const zoneFrost = document.getElementById("zoneFrost");
   const changeZoneBtn = document.getElementById("changeZoneBtn");
   const guideSearch = document.getElementById("guideSearch");
   const guideFilter = document.getElementById("guideFilter");
@@ -267,11 +268,20 @@
   let currentZone = localStorage.getItem(ZONE_KEY) || "";
   if (currentZone) zoneSel.value = currentZone;
 
+  function fmtMD(md) {
+    return `${MONTHS[md[0] - 1]} ${md[1]}`;
+  }
   function updateZoneUI() {
     const isSet = !!(currentZone && DATA.ZONE_FROST[currentZone]);
     zoneDisplay.hidden = !isSet;
     zoneEdit.hidden = isSet;
-    if (isSet) zoneCurrent.textContent = currentZone.toUpperCase();
+    if (isSet) {
+      zoneCurrent.textContent = currentZone.toUpperCase();
+      const fr = DATA.ZONE_FROST[currentZone];
+      zoneFrost.textContent = fr.frostFree
+        ? "❄️ Frost-free"
+        : `❄️ Last frost ~${fmtMD(fr.lastFrost)} · First frost ~${fmtMD(fr.firstFall)}`;
+    }
   }
   changeZoneBtn.addEventListener("click", () => {
     zoneDisplay.hidden = true;
