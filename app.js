@@ -250,6 +250,8 @@
     } else if (act === "delete") {
       if (confirm(`Delete “${plant.name}”? This can't be undone.`)) {
         plants = plants.filter((p) => p.id !== id);
+        beds.forEach((b) => { b.plantings = (b.plantings || []).filter((pl) => pl.id !== id); });
+        saveBeds();
         save();
         render();
       }
@@ -273,7 +275,8 @@
 
   // --- Backup: export / import ---
   document.getElementById("exportBtn").addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(plants, null, 2)], { type: "application/json" });
+    const payload = { version: 2, plants, beds };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -291,11 +294,18 @@
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result);
-        if (!Array.isArray(data)) throw new Error("Not a valid backup file.");
-        if (confirm(`Import ${data.length} plant(s)? This replaces your current list.`)) {
-          plants = data;
+        // v1 backups were a plain array of plants; v2 is { plants, beds }.
+        const newPlants = Array.isArray(data) ? data : (data.plants || []);
+        const newBeds = Array.isArray(data) ? [] : (data.beds || []);
+        if (!Array.isArray(newPlants)) throw new Error("Not a valid backup file.");
+        const bedNote = newBeds.length ? ` and ${newBeds.length} bed(s)` : "";
+        if (confirm(`Import ${newPlants.length} plant(s)${bedNote}? This replaces your current data.`)) {
+          plants = newPlants;
+          beds = newBeds;
           save();
+          saveBeds();
           render();
+          if (!views.beds.hidden) renderBeds();
         }
       } catch (err) {
         alert("Couldn't import that file: " + err.message);
@@ -320,6 +330,7 @@
   const views = {
     garden: document.getElementById("gardenView"),
     guide: document.getElementById("guideView"),
+    beds: document.getElementById("bedsView"),
   };
   const tabs = document.querySelectorAll(".tab");
   const zoneSel = document.getElementById("zone");
@@ -363,7 +374,9 @@
     tabs.forEach((t) => t.classList.toggle("active", t.dataset.view === name));
     views.garden.hidden = name !== "garden";
     views.guide.hidden = name !== "guide";
+    views.beds.hidden = name !== "beds";
     if (name === "guide") renderGuide();
+    if (name === "beds") renderBeds();
   }
 
   zoneSel.addEventListener("change", () => {
@@ -699,6 +712,495 @@
     const stale = !weather || (Date.now() - (weather.fetchedAt || 0)) > 3 * 3600 * 1000;
     if (stale && navigator.onLine) fetchWeather();
   }
+
+  // ===================== Visual Bed Planner =====================
+  const BEDS_KEY = "garden.beds.v1";
+  const CELL_IN = 12; // one grid cell = 12" = one "square foot"
+  let beds = loadJson(BEDS_KEY, []);
+  let currentBedId = null;
+  let armedTool = { kind: "select" };
+
+  function saveBeds() { localStorage.setItem(BEDS_KEY, JSON.stringify(beds)); }
+  function currentBed() { return beds.find((b) => b.id === currentBedId) || null; }
+
+  // --- geometry ---
+  function bedCols(b) {
+    const ft = b.shape === "circle" ? b.diameterFt : b.widthFt;
+    return Math.max(1, Math.round((ft || 1) * 12 / CELL_IN));
+  }
+  function bedRows(b) {
+    const ft = b.shape === "circle" ? b.diameterFt : b.lengthFt;
+    return Math.max(1, Math.round((ft || 1) * 12 / CELL_IN));
+  }
+  function inCircle(b, c, r) {
+    if (b.shape !== "circle") return true;
+    const n = bedCols(b), R = n / 2;
+    const dx = (c + 0.5) - R, dy = (r + 0.5) - R;
+    return dx * dx + dy * dy <= R * R + 1e-6;
+  }
+  function isBlocked(b, c, r) { return (b.blocked || []).includes(c + "," + r); }
+  function inBounds(b, c, r) { return c >= 0 && r >= 0 && c < bedCols(b) && r < bedRows(b); }
+  function cellUsable(b, c, r) { return inBounds(b, c, r) && inCircle(b, c, r); }
+  function cellPlantable(b, c, r) { return cellUsable(b, c, r) && !isBlocked(b, c, r); }
+  function plantingAt(b, c, r) {
+    return (b.plantings || []).find((pl) =>
+      c >= pl.col && c < pl.col + (pl.wCells || 1) &&
+      r >= pl.row && r < pl.row + (pl.hCells || 1));
+  }
+
+  // --- spacing → per-square count / footprint ---
+  function plantGeom(spacingIn) {
+    const sp = spacingIn && spacingIn > 0 ? spacingIn : CELL_IN;
+    if (sp > CELL_IN) {
+      const span = Math.ceil(sp / CELL_IN);
+      return { w: span, h: span, qty: 1 };
+    }
+    const perRow = Math.floor(CELL_IN / sp);
+    return { w: 1, h: 1, qty: Math.min(16, Math.max(1, perRow * perRow)) };
+  }
+  function footprintClear(b, col, row, w, h) {
+    for (let dc = 0; dc < w; dc++) for (let dr = 0; dr < h; dr++) {
+      const c = col + dc, r = row + dr;
+      if (!cellPlantable(b, c, r) || plantingAt(b, c, r)) return false;
+    }
+    return true;
+  }
+
+  function plantEmoji(name) {
+    const n = (name || "").toLowerCase();
+    const map = [
+      ["tomato", "🍅"], ["garlic", "🧄"], ["carrot", "🥕"], ["bean", "🫘"],
+      ["pea", "🟢"], ["cucumber", "🥒"], ["zucchini", "🥒"], ["squash", "🎃"],
+      ["watermelon", "🍉"], ["melon", "🍈"], ["asparagus", "🌿"], ["pepper", "🫑"],
+      ["lettuce", "🥬"], ["onion", "🧅"], ["potato", "🥔"], ["corn", "🌽"],
+      ["strawberr", "🍓"], ["basil", "🌿"], ["herb", "🌿"], ["broccoli", "🥦"],
+      ["eggplant", "🍆"], ["pumpkin", "🎃"], ["kale", "🥬"], ["radish", "🌶️"],
+    ];
+    for (const [k, e] of map) if (n.includes(k)) return e;
+    return "🌱";
+  }
+  function guideNote(gp) {
+    const parts = [`${gp.crop} (${gp.latin}).`];
+    if (gp.daysToMaturity) parts.push(`~${gp.daysToMaturity} days to harvest.`);
+    if (gp.spacingIn) parts.push(`Space ${gp.spacingIn}" apart.`);
+    if (gp.sources && gp.sources[0]) parts.push(`Source: ${gp.sources[0].name}.`);
+    return parts.join(" ");
+  }
+
+  // --- placement / removal (integrated with My Garden tracker) ---
+  function placePlant(b, col, row, meta) {
+    const g = plantGeom(meta.spacingIn);
+    if (!footprintClear(b, col, row, g.w, g.h)) return false;
+    const plant = {
+      id: uid(),
+      name: meta.name,
+      location: b.name,
+      planted: todayStr(),
+      interval: 3,
+      sun: ["Full sun", "Partial sun", "Shade"].includes(meta.sun) ? meta.sun : "",
+      notes: (meta.note ? meta.note + " " : "") + `In ${b.name}.`,
+      lastWatered: "",
+      bedId: b.id,
+    };
+    plants.push(plant);
+    b.plantings = b.plantings || [];
+    b.plantings.push({
+      id: plant.id, col, row, wCells: g.w, hCells: g.h,
+      name: meta.name, guideId: meta.guideId || null, qty: g.qty, emoji: plantEmoji(meta.name),
+    });
+    save(); saveBeds();
+    return true;
+  }
+  function removePlanting(b, plantingId) {
+    b.plantings = (b.plantings || []).filter((pl) => pl.id !== plantingId);
+    plants = plants.filter((p) => p.id !== plantingId);
+    save(); saveBeds();
+  }
+
+  function lostPlantings(b) {
+    return (b.plantings || []).filter((pl) => {
+      for (let dc = 0; dc < (pl.wCells || 1); dc++) for (let dr = 0; dr < (pl.hCells || 1); dr++) {
+        if (!cellUsable(b, pl.col + dc, pl.row + dr)) return true;
+      }
+      return false;
+    });
+  }
+  // Apply geometry changes (shape/dims); prune plantings that no longer fit.
+  function applyBedChanges(b, changes) {
+    const temp = Object.assign({}, b, changes);
+    const lost = lostPlantings(temp);
+    if (lost.length && !confirm(`This change removes ${lost.length} planting(s) that no longer fit. Continue?`)) return false;
+    Object.assign(b, changes);
+    const lostIds = new Set(lost.map((p) => p.id));
+    b.plantings = (b.plantings || []).filter((pl) => !lostIds.has(pl.id));
+    plants = plants.filter((p) => !lostIds.has(p.id));
+    b.blocked = (b.blocked || []).filter((k) => {
+      const [c, r] = k.split(",").map(Number);
+      return cellUsable(b, c, r);
+    });
+    save(); saveBeds();
+    return true;
+  }
+
+  // --- SVG grid ---
+  function buildBedSvg(b, interactive) {
+    const cols = bedCols(b), rows = bedRows(b);
+    const blocked = new Set(b.blocked || []);
+    const p = [];
+    p.push(`<svg class="bed-svg" viewBox="-0.1 -0.1 ${cols + 0.2} ${rows + 0.2}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`);
+    p.push(`<defs><pattern id="hatch" width="0.3" height="0.3" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><rect width="0.3" height="0.3" fill="#e4ddd2"/><line x1="0" y1="0" x2="0" y2="0.3" stroke="#b9ac97" stroke-width="0.14"/></pattern></defs>`);
+    const raised = b.kind !== "inground";
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      if (!inCircle(b, c, r)) continue;
+      const isB = blocked.has(c + "," + r);
+      const fill = isB ? "url(#hatch)" : (raised ? "#ffffff" : "#f4efe3");
+      const stroke = raised ? "#c3d4b8" : "#d9cdb2";
+      const attrs = interactive ? ` data-col="${c}" data-row="${r}"` : "";
+      p.push(`<rect class="bed-cell" x="${c}" y="${r}" width="1" height="1" fill="${fill}" stroke="${stroke}" stroke-width="0.04" vector-effect="non-scaling-stroke"${attrs}></rect>`);
+    }
+    if (b.shape === "circle") {
+      const R = cols / 2;
+      p.push(`<circle cx="${R}" cy="${R}" r="${R}" fill="none" stroke="#8fb37d" stroke-width="0.08" vector-effect="non-scaling-stroke"></circle>`);
+    }
+    (b.plantings || []).forEach((pl) => {
+      const w = pl.wCells || 1, h = pl.hCells || 1;
+      const attrs = interactive ? ` data-planting="${pl.id}"` : "";
+      p.push(`<g class="bed-planting"${attrs}>`);
+      p.push(`<rect x="${pl.col + 0.07}" y="${pl.row + 0.07}" width="${w - 0.14}" height="${h - 0.14}" rx="0.12" fill="#e5f2df" stroke="#5a9247" stroke-width="0.05" vector-effect="non-scaling-stroke"></rect>`);
+      p.push(`<text x="${pl.col + w / 2}" y="${pl.row + h / 2}" text-anchor="middle" dominant-baseline="central" font-size="${Math.min(w, h) * 0.52}">${pl.emoji || "🌱"}</text>`);
+      if (pl.qty > 1) p.push(`<text x="${pl.col + w - 0.12}" y="${pl.row + h - 0.14}" text-anchor="end" dominant-baseline="central" font-size="0.24" fill="#3a5a2c">×${pl.qty}</text>`);
+      p.push(`</g>`);
+    });
+    p.push(`</svg>`);
+    return p.join("");
+  }
+
+  function bedDims(b) {
+    return b.shape === "circle" ? `◯ ${b.diameterFt} ft` : `▭ ${b.widthFt}×${b.lengthFt} ft`;
+  }
+  function bedStats(b) {
+    let usable = 0, used = 0;
+    const cols = bedCols(b), rows = bedRows(b);
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      if (cellUsable(b, c, r) && !isBlocked(b, c, r)) usable++;
+    }
+    (b.plantings || []).forEach((pl) => { used += (pl.wCells || 1) * (pl.hCells || 1); });
+    return { usable, used, blocked: (b.blocked || []).length, plantings: (b.plantings || []).length };
+  }
+
+  // --- rendering: list vs editor ---
+  const bedsRoot = document.getElementById("bedsRoot");
+
+  function renderBeds() {
+    const b = currentBed();
+    if (b) renderBedEditor(b); else { currentBedId = null; renderBedList(); }
+  }
+
+  function renderBedList() {
+    if (!beds.length) {
+      bedsRoot.innerHTML = `
+        <section class="beds-intro">
+          <h2>Garden beds</h2>
+          <p class="muted">Lay out your raised beds and in-ground gardens on a square-foot grid, then tap to place plants. Everything stays on this device.</p>
+          <button class="primary" data-bed-act="newbed">+ New bed</button>
+        </section>`;
+      return;
+    }
+    const cards = beds.map((bd) => {
+      const s = bedStats(bd);
+      return `
+        <button class="bed-card" data-bed-open="${bd.id}">
+          <div class="bed-card-preview">${buildBedSvg(bd, false)}</div>
+          <div class="bed-card-info">
+            <strong>${escapeHtml(bd.name)}</strong>
+            <span class="muted">${bd.kind === "inground" ? "In-ground" : "Raised"} · ${bedDims(bd)}</span>
+            <span class="muted">🌱 ${s.plantings} planting${s.plantings === 1 ? "" : "s"}${s.blocked ? ` · 🧱 ${s.blocked}` : ""}</span>
+          </div>
+        </button>`;
+    }).join("");
+    bedsRoot.innerHTML = `
+      <section class="beds-list-head">
+        <h2>Garden beds</h2>
+        <button class="primary" data-bed-act="newbed">+ New bed</button>
+      </section>
+      <section class="beds-grid">${cards}</section>`;
+  }
+
+  function paletteHtml() {
+    const chips = [];
+    chips.push(`<button class="chip ${armedTool.kind === "select" ? "on" : ""}" data-tool="select">✋ Select</button>`);
+    chips.push(`<button class="chip ${armedTool.kind === "block" ? "on" : ""}" data-tool="block">🧱 Path/Block</button>`);
+    chips.push(`<button class="chip ${armedTool.kind === "plant" && armedTool.meta && !armedTool.meta.guideId ? "on" : ""}" data-tool="custom">✏️ Custom…</button>`);
+    (DATA.PLANTS || []).forEach((gp, i) => {
+      const on = armedTool.kind === "plant" && armedTool.meta && armedTool.meta.guideId === gp.id;
+      chips.push(`<button class="chip ${on ? "on" : ""}" data-tool="plant:${i}">${plantEmoji(gp.name)} ${escapeHtml(gp.name)}</button>`);
+    });
+    return chips.join("");
+  }
+
+  function toolHint(b) {
+    if (armedTool.kind === "block") return "🧱 Tap squares to mark paths/bricks (non-plantable). Tap a blocked square to clear it.";
+    if (armedTool.kind === "plant") {
+      const g = plantGeom(armedTool.meta.spacingIn);
+      const cap = g.w > 1 || g.h > 1 ? `spans ${g.w}×${g.h} squares` : `${g.qty} per square`;
+      return `Placing ${escapeHtml(armedTool.meta.name)} (${cap}) — tap a square.`;
+    }
+    return "Tap a plant to edit it. Pick a plant below to place it, or use 🧱 to add paths.";
+  }
+
+  function renderBedEditor(b) {
+    const s = bedStats(b);
+    const resize = b.shape === "circle"
+      ? `<div class="resize-group"><span>Diameter</span><button data-resize="d-">−</button><b>${b.diameterFt} ft</b><button data-resize="d+">+</button></div>`
+      : `<div class="resize-group"><span>Width</span><button data-resize="w-">−</button><b>${b.widthFt} ft</b><button data-resize="w+">+</button></div>
+         <div class="resize-group"><span>Length</span><button data-resize="l-">−</button><b>${b.lengthFt} ft</b><button data-resize="l+">+</button></div>`;
+    bedsRoot.innerHTML = `
+      <div class="bed-editor-head">
+        <button class="link-btn" data-bed-act="back">‹ Beds</button>
+        <div class="bed-editor-title">
+          <strong>${escapeHtml(b.name)}</strong>
+          <span class="muted">${b.kind === "inground" ? "In-ground" : "Raised"} · ${bedDims(b)}</span>
+        </div>
+        <div class="bed-editor-btns">
+          <button data-bed-act="editbed">Edit</button>
+          <button data-bed-act="deletebed">Delete</button>
+        </div>
+      </div>
+      <div class="bed-resize">${resize}</div>
+      <div class="bed-palette">${paletteHtml()}</div>
+      <p class="bed-hint">${toolHint(b)}</p>
+      <div class="bed-grid-wrap">${buildBedSvg(b, true)}</div>
+      <p class="bed-summary muted">🟩 ${s.used}/${s.usable} squares used · 🌱 ${s.plantings} planting${s.plantings === 1 ? "" : "s"}${s.blocked ? ` · 🧱 ${s.blocked} path` : ""}</p>`;
+  }
+
+  // --- interactions (delegated on the static bedsView container) ---
+  function armTool(spec) {
+    const b = currentBed();
+    if (spec === "select") armedTool = { kind: "select" };
+    else if (spec === "block") armedTool = { kind: "block" };
+    else if (spec === "custom") {
+      const name = (prompt("Custom plant name:") || "").trim();
+      if (!name) return;
+      armedTool = { kind: "plant", meta: { name, spacingIn: null, sun: "", guideId: null, note: "Custom plant." } };
+    } else if (spec.startsWith("plant:")) {
+      const gp = (DATA.PLANTS || [])[parseInt(spec.slice(6), 10)];
+      if (!gp) return;
+      armedTool = { kind: "plant", meta: { name: gp.name, spacingIn: gp.spacingIn, sun: gp.sun, guideId: gp.id, note: guideNote(gp) } };
+    }
+    if (b) renderBedEditor(b);
+  }
+
+  function onCellTap(c, r) {
+    const b = currentBed();
+    if (!b) return;
+    if (armedTool.kind === "block") {
+      if (isBlocked(b, c, r)) {
+        b.blocked = (b.blocked || []).filter((k) => k !== c + "," + r);
+        saveBeds(); renderBedEditor(b); return;
+      }
+      if (!cellUsable(b, c, r) || plantingAt(b, c, r)) return;
+      b.blocked = b.blocked || [];
+      b.blocked.push(c + "," + r);
+      saveBeds(); renderBedEditor(b); return;
+    }
+    if (armedTool.kind === "plant") {
+      const hit = plantingAt(b, c, r);
+      if (hit) { openPlantingDialog(b, hit); return; }
+      if (!cellPlantable(b, c, r)) return;
+      if (!placePlant(b, c, r, armedTool.meta)) {
+        alert("Not enough room here — this plant needs more space (it's blocked or off the edge).");
+      }
+      renderBedEditor(b);
+    }
+  }
+
+  function onPlantingTap(id) {
+    const b = currentBed();
+    if (!b) return;
+    const pl = (b.plantings || []).find((x) => x.id === id);
+    if (pl) openPlantingDialog(b, pl);
+  }
+
+  bedsRoot.addEventListener("click", (e) => {
+    const open = e.target.closest("[data-bed-open]");
+    if (open) { currentBedId = open.getAttribute("data-bed-open"); armedTool = { kind: "select" }; renderBeds(); return; }
+    const act = e.target.closest("[data-bed-act]");
+    if (act) { handleBedAct(act.getAttribute("data-bed-act")); return; }
+    const rs = e.target.closest("[data-resize]");
+    if (rs) { handleResize(rs.getAttribute("data-resize")); return; }
+    const tool = e.target.closest("[data-tool]");
+    if (tool) { armTool(tool.getAttribute("data-tool")); return; }
+    const pl = e.target.closest("[data-planting]");
+    if (pl) { onPlantingTap(pl.getAttribute("data-planting")); return; }
+    const cell = e.target.closest("[data-col]");
+    if (cell) { onCellTap(+cell.getAttribute("data-col"), +cell.getAttribute("data-row")); return; }
+  });
+
+  function handleBedAct(a) {
+    const b = currentBed();
+    if (a === "newbed") openBedDialog(null);
+    else if (a === "back") { currentBedId = null; renderBeds(); }
+    else if (a === "editbed" && b) openBedDialog(b);
+    else if (a === "deletebed" && b) {
+      const s = bedStats(b);
+      const msg = s.plantings
+        ? `Delete “${b.name}” and its ${s.plantings} placed plant(s) from My Garden?`
+        : `Delete “${b.name}”?`;
+      if (confirm(msg)) {
+        const ids = new Set((b.plantings || []).map((pl) => pl.id));
+        plants = plants.filter((p) => !ids.has(p.id));
+        beds = beds.filter((x) => x.id !== b.id);
+        currentBedId = null;
+        save(); saveBeds(); render(); renderBeds();
+      }
+    }
+  }
+
+  function handleResize(op) {
+    const b = currentBed();
+    if (!b) return;
+    const MIN = 1, MAX = 30;
+    const clamp = (v) => Math.max(MIN, Math.min(MAX, v));
+    let changes = null;
+    if (op === "w+") changes = { widthFt: clamp((b.widthFt || 4) + 1) };
+    else if (op === "w-") changes = { widthFt: clamp((b.widthFt || 4) - 1) };
+    else if (op === "l+") changes = { lengthFt: clamp((b.lengthFt || 8) + 1) };
+    else if (op === "l-") changes = { lengthFt: clamp((b.lengthFt || 8) - 1) };
+    else if (op === "d+") changes = { diameterFt: clamp((b.diameterFt || 4) + 1) };
+    else if (op === "d-") changes = { diameterFt: clamp((b.diameterFt || 4) - 1) };
+    if (changes) { applyBedChanges(b, changes); renderBedEditor(b); }
+  }
+
+  // --- bed create/edit dialog ---
+  const bedDialog = document.getElementById("bedDialog");
+  const bedForm = document.getElementById("bedForm");
+  const bedFields = {
+    id: document.getElementById("bedId"),
+    name: document.getElementById("bedName"),
+    kind: document.getElementById("bedKind"),
+    shape: document.getElementById("bedShape"),
+    width: document.getElementById("bedWidth"),
+    length: document.getElementById("bedLength"),
+    diameter: document.getElementById("bedDiameter"),
+  };
+  const rectDims = document.getElementById("rectDims");
+  const circleDims = document.getElementById("circleDims");
+  function syncShapeFields() {
+    const circ = bedFields.shape.value === "circle";
+    rectDims.hidden = circ;
+    circleDims.hidden = !circ;
+  }
+  bedFields.shape.addEventListener("change", syncShapeFields);
+
+  function openBedDialog(b) {
+    bedForm.reset();
+    if (b) {
+      document.getElementById("bedDialogTitle").textContent = "Edit bed";
+      bedFields.id.value = b.id;
+      bedFields.name.value = b.name || "";
+      bedFields.kind.value = b.kind || "raised";
+      bedFields.shape.value = b.shape || "rect";
+      bedFields.width.value = b.widthFt || 4;
+      bedFields.length.value = b.lengthFt || 8;
+      bedFields.diameter.value = b.diameterFt || 4;
+    } else {
+      document.getElementById("bedDialogTitle").textContent = "New bed";
+      bedFields.id.value = "";
+      bedFields.kind.value = "raised";
+      bedFields.shape.value = "rect";
+      bedFields.width.value = 4;
+      bedFields.length.value = 8;
+      bedFields.diameter.value = 4;
+    }
+    syncShapeFields();
+    bedDialog.showModal();
+    bedFields.name.focus();
+  }
+
+  bedForm.addEventListener("submit", (e) => {
+    if (!bedFields.name.value.trim()) return;
+    e.preventDefault();
+    const name = bedFields.name.value.trim();
+    const kind = bedFields.kind.value;
+    const shape = bedFields.shape.value;
+    const widthFt = Math.max(1, Math.min(30, parseInt(bedFields.width.value, 10) || 4));
+    const lengthFt = Math.max(1, Math.min(30, parseInt(bedFields.length.value, 10) || 8));
+    const diameterFt = Math.max(1, Math.min(30, parseInt(bedFields.diameter.value, 10) || 4));
+    const existing = bedFields.id.value ? beds.find((x) => x.id === bedFields.id.value) : null;
+    if (existing) {
+      existing.name = name;
+      existing.kind = kind;
+      (existing.plantings || []).forEach((pl) => {
+        const p = plants.find((x) => x.id === pl.id);
+        if (p) p.location = name;
+      });
+      applyBedChanges(existing, { shape, widthFt, lengthFt, diameterFt });
+      save(); saveBeds();
+      currentBedId = existing.id;
+    } else {
+      const bed = {
+        id: uid(), name, kind, shape,
+        widthFt, lengthFt, diameterFt,
+        cellIn: CELL_IN, blocked: [], plantings: [],
+      };
+      beds.push(bed);
+      currentBedId = bed.id;
+      saveBeds();
+    }
+    bedDialog.close();
+    switchView("beds");
+    renderBeds();
+  });
+  document.getElementById("bedCancelBtn").addEventListener("click", () => bedDialog.close());
+  bedDialog.addEventListener("click", (e) => { if (e.target === bedDialog) bedDialog.close(); });
+
+  // --- planting (occupied cell) dialog ---
+  const plantingDialog = document.getElementById("plantingDialog");
+  const pdQty = document.getElementById("pdQty");
+  let pdContext = null; // { bedId, plantingId }
+  function openPlantingDialog(b, pl) {
+    pdContext = { bedId: b.id, plantingId: pl.id };
+    document.getElementById("pdTitle").textContent = pl.name;
+    const p = plants.find((x) => x.id === pl.id);
+    const st = p ? waterStatus(p) : null;
+    document.getElementById("pdInfo").textContent =
+      `${pl.emoji || "🌱"} ${pl.name} · square-foot spot in ${b.name}.` + (st ? ` ${st.label}.` : "");
+    pdQty.value = pl.qty || 1;
+    plantingDialog.showModal();
+  }
+  pdQty.addEventListener("change", () => {
+    if (!pdContext) return;
+    const b = beds.find((x) => x.id === pdContext.bedId);
+    const pl = b && (b.plantings || []).find((x) => x.id === pdContext.plantingId);
+    if (!pl) return;
+    pl.qty = Math.max(1, Math.min(99, parseInt(pdQty.value, 10) || 1));
+    saveBeds();
+    if (currentBedId === b.id) renderBedEditor(b);
+  });
+  plantingDialog.addEventListener("click", (e) => {
+    if (e.target === plantingDialog) { plantingDialog.close(); return; }
+    const btn = e.target.closest("[data-pd]");
+    if (!btn) return;
+    const act = btn.getAttribute("data-pd");
+    const b = pdContext && beds.find((x) => x.id === pdContext.bedId);
+    if (act === "close") { plantingDialog.close(); return; }
+    if (!b || !pdContext) { plantingDialog.close(); return; }
+    if (act === "water") {
+      const p = plants.find((x) => x.id === pdContext.plantingId);
+      if (p) { p.lastWatered = todayStr(); save(); }
+      plantingDialog.close();
+    } else if (act === "open") {
+      plantingDialog.close();
+      switchView("garden");
+    } else if (act === "remove") {
+      if (confirm("Remove this plant from the bed and My Garden?")) {
+        removePlanting(b, pdContext.plantingId);
+        plantingDialog.close();
+        if (currentBedId === b.id) renderBedEditor(b);
+        render();
+      }
+    }
+  });
 
   render();
 })();

@@ -22,6 +22,7 @@
   <nav class="tabs" role="tablist">
     <button class="tab active" data-view="garden" role="tab">🪴 My Garden</button>
     <button class="tab" data-view="guide" role="tab">📅 Planting Guide</button>
+    <button class="tab" data-view="beds" role="tab">🗺️ Beds</button>
   </nav>
 
   <main id="gardenView">
@@ -113,6 +114,10 @@
     <p id="guideEmpty" class="empty" hidden></p>
   </main>
 
+  <main id="bedsView" hidden>
+    <section id="bedsRoot"></section>
+  </main>
+
   <!-- Settings dialog -->
   <dialog id="settingsDialog">
     <div class="settings-body">
@@ -167,6 +172,72 @@
         <button type="submit" class="primary" id="saveBtn">Save</button>
       </menu>
     </form>
+  </dialog>
+
+  <!-- New/Edit bed dialog -->
+  <dialog id="bedDialog">
+    <form id="bedForm" method="dialog">
+      <h2 id="bedDialogTitle">New bed</h2>
+      <input type="hidden" id="bedId" />
+
+      <label>Name *
+        <input type="text" id="bedName" required maxlength="40" placeholder="Front bed, Herb circle…" />
+      </label>
+
+      <div class="row">
+        <label>Type
+          <select id="bedKind">
+            <option value="raised">Raised bed</option>
+            <option value="inground">In-ground</option>
+          </select>
+        </label>
+        <label>Shape
+          <select id="bedShape">
+            <option value="rect">Rectangle</option>
+            <option value="circle">Circle</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="row" id="rectDims">
+        <label>Width (ft)
+          <input type="number" id="bedWidth" min="1" max="30" value="4" />
+        </label>
+        <label>Length (ft)
+          <input type="number" id="bedLength" min="1" max="30" value="8" />
+        </label>
+      </div>
+
+      <label id="circleDims" hidden>Diameter (ft)
+        <input type="number" id="bedDiameter" min="1" max="30" value="4" />
+      </label>
+
+      <menu class="dialog-actions">
+        <button type="button" id="bedCancelBtn" value="cancel">Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <!-- Planting (occupied cell) dialog -->
+  <dialog id="plantingDialog">
+    <div class="settings-body">
+      <div class="settings-head">
+        <h2 id="pdTitle">Plant</h2>
+        <button type="button" class="icon-btn dark" data-pd="close" aria-label="Close">✕</button>
+      </div>
+      <div class="settings-section">
+        <p id="pdInfo" class="muted"></p>
+        <label class="pd-qty">Plants in this square
+          <input type="number" id="pdQty" min="1" max="99" />
+        </label>
+        <div class="pd-actions">
+          <button type="button" data-pd="water" class="primary">💧 Water now</button>
+          <button type="button" data-pd="open">Open in My Garden</button>
+          <button type="button" data-pd="remove">Remove from bed</button>
+        </div>
+      </div>
+    </div>
   </dialog>
 
   <script src="garden-data.js"></script>
