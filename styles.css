@@ -220,6 +220,18 @@ select, input, textarea {
 .timing li { padding: 0.3rem 0.55rem; background: #f4f7f2; border-radius: 8px; }
 .timing li.now { background: var(--thirsty-bg); color: var(--thirsty); font-weight: 600; }
 
+/* Harvesting — guide reference block */
+.harvest-guide { margin-top: 0.6rem; padding: 0.6rem 0.75rem; background: #fbf7ec; border: 1px solid #ece0c4; border-radius: 10px; }
+.harvest-guide h4 { margin: 0 0 0.35rem; font-size: 0.9rem; color: #7a5a00; }
+.harvest-guide p { margin: 0.25rem 0; font-size: 0.85rem; line-height: 1.35; }
+.harvest-guide strong { color: var(--text); }
+
+/* Harvesting — My Garden countdown note */
+.harvest-note { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--green-dark); background: var(--green-light); border-radius: 8px; padding: 0.4rem 0.6rem; }
+.harvest-note.soon { color: #7a5a00; background: #fff8e1; }
+.harvest-note.ready { color: #8a4b00; background: #ffe9cf; font-weight: 600; }
+.harvest-note .cue { display: inline-block; margin-top: 0.2rem; font-weight: 400; color: var(--muted); }
+
 .backup { margin-top: 2rem; border-top: 1px dashed var(--border); padding-top: 1.25rem; }
 .backup h2 { margin: 0 0 0.25rem; font-size: 1.05rem; }
 .backup-actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }

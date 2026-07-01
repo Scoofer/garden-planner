@@ -168,6 +168,27 @@
     return cropVarietyName(p.name, plantCrop(p));
   }
 
+  // The matching guide plant for a tracked plant (by exact name), if any.
+  function guidePlantFor(p) {
+    if (!p || !p.name) return null;
+    return guidePlants().find((g) => g.name && g.name.toLowerCase() === p.name.toLowerCase()) || null;
+  }
+
+  // Estimated first-harvest window for a tracked plant, from its planted date +
+  // the crop's days-to-maturity. Returns null when we can't estimate.
+  function harvestEstimate(p) {
+    if (!p || !p.planted) return null;
+    const gp = guidePlantFor(p);
+    const dtm = p.daysToMaturity != null ? p.daysToMaturity : (gp && gp.daysToMaturity);
+    if (!dtm) return null;
+    const planted = parseLocalDate(p.planted);
+    if (!planted || isNaN(planted.getTime())) return null;
+    const ready = new Date(planted.getTime() + dtm * MS_PER_DAY);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const daysLeft = Math.round((ready.getTime() - today.getTime()) / MS_PER_DAY);
+    return { ready, daysLeft, dtm, cues: gp && gp.harvest ? gp.harvest.cues : "" };
+  }
+
   // --- Rendering ---
   function render() {
     renderWeatherPanel();
@@ -219,6 +240,18 @@
       ? `<p class="rain-note">🌧️ Counting ${base.rain.inches.toFixed(2)}″ rain on ${fmtDate(base.rain.date)} as a watering.</p>`
       : "";
 
+    const harv = harvestEstimate(p);
+    let harvestNote = "";
+    if (harv) {
+      const readyStr = harv.ready.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+      if (harv.daysLeft > 0) {
+        const soon = harv.daysLeft <= 14;
+        harvestNote = `<p class="harvest-note${soon ? " soon" : ""}">🧺 Est. harvest in ~${harv.daysLeft} day${harv.daysLeft === 1 ? "" : "s"} <span class="muted">(around ${readyStr})</span>${soon && harv.cues ? `<br><span class="cue">${escapeHtml(harv.cues)}</span>` : ""}</p>`;
+      } else {
+        harvestNote = `<p class="harvest-note ready">🧺 Harvest window open <span class="muted">(est. matured ${readyStr})</span>${harv.cues ? `<br><span class="cue">${escapeHtml(harv.cues)}</span>` : ""}</p>`;
+      }
+    }
+
     return `
       <article class="card ${st.cls}" data-id="${p.id}">
         <div class="card-top">
@@ -227,6 +260,7 @@
         </div>
         ${meta.length ? `<p class="meta">${meta.join("")}</p>` : ""}
         ${rainNote}
+        ${harvestNote}
         ${p.notes ? `<p class="notes">${escapeHtml(p.notes)}</p>` : ""}
         <div class="card-actions">
           <button class="water-btn" data-act="water">💧 Water now</button>
@@ -625,6 +659,14 @@
       ? `<p class="latin">${escapeHtml(p.crop || "")} · <em>${escapeHtml(p.latin)}</em></p>`
       : (p.crop ? `<p class="latin">${escapeHtml(p.crop)}</p>` : "");
 
+    const harvestBlock = p.harvest ? `
+        <div class="harvest-guide">
+          <h4>🧺 Harvesting</h4>
+          ${p.harvest.cues ? `<p><strong>When it's ready:</strong> ${escapeHtml(p.harvest.cues)}</p>` : ""}
+          ${p.harvest.how ? `<p><strong>How to pick:</strong> ${escapeHtml(p.harvest.how)}</p>` : ""}
+          ${p.harvest.storage ? `<p><strong>Storing:</strong> ${escapeHtml(p.harvest.storage)}</p>` : ""}
+        </div>` : "";
+
     const actions = p.custom
       ? `<button class="water-btn" data-act="add">+ Add to my garden</button>
          <button data-act="edit-custom">Edit</button>
@@ -641,6 +683,7 @@
         ${timing}
         ${facts.length ? `<p class="meta">${facts.join("")}</p>` : ""}
         ${p.tips ? `<p class="notes">${escapeHtml(p.tips)}</p>` : ""}
+        ${harvestBlock}
         ${src ? `<p class="source">📖 Source: ${src}${p.sources[0].retrieved ? ` <span class="muted">(${p.sources[0].retrieved})</span>` : ""}</p>` : ""}
         <div class="card-actions">
           ${actions}
