@@ -179,15 +179,15 @@ window.GARDEN_DATA = (function () {
       sources: [ANNIES],
     },
     {
-      id: "green-beans-bush",
-      name: "Green Beans (bush)",
-      crop: "Bush bean", latin: "Phaseolus vulgaris",
-      sun: "Full sun", spacingIn: 4, rowIn: 24, depthIn: 1,
-      daysToMaturity: 55, germDays: "7–10", perennial: false,
+      id: "green-beans-pole",
+      name: "Green Beans (pole)",
+      crop: "Pole bean", latin: "Phaseolus vulgaris",
+      sun: "Full sun", spacingIn: 4, rowIn: 36, depthIn: 1,
+      daysToMaturity: 65, germDays: "7–10", perennial: false,
       methods: [
-        { type: "Direct sow", anchor: "lastFrost", startWk: 0, endWk: 6 },
+        { type: "Direct sow", anchor: "lastFrost", startWk: 0, endWk: 4 },
       ],
-      tips: "Generic bush green bean guidance. Sow after frost in warm soil; succession-sow every 2–3 weeks for a continuous harvest.",
+      tips: "Vining/pole green bean — needs a trellis, teepee, or fence to climb (6–8' vines). Sow after frost in warm soil at the base of the support. Unlike bush beans, pole beans keep producing over a long season, so pick regularly to keep them going.",
       sources: [GENERAL],
     },
     {
