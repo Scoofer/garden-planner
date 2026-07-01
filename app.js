@@ -765,6 +765,26 @@
     }
     return true;
   }
+  // Like footprintClear but ignores one existing planting (used when resizing it).
+  function footprintClearExcept(b, col, row, w, h, exceptId) {
+    for (let dc = 0; dc < w; dc++) for (let dr = 0; dr < h; dr++) {
+      const c = col + dc, r = row + dr;
+      if (!cellPlantable(b, c, r)) return false;
+      const hit = plantingAt(b, c, r);
+      if (hit && hit.id !== exceptId) return false;
+    }
+    return true;
+  }
+  // Resize a planting's footprint (in squares). Returns true if applied.
+  function resizePlanting(b, pl, w, h) {
+    w = Math.max(1, Math.min(bedCols(b), w));
+    h = Math.max(1, Math.min(bedRows(b), h));
+    if (pl.col + w > bedCols(b) || pl.row + h > bedRows(b)) return false;
+    if (!footprintClearExcept(b, pl.col, pl.row, w, h, pl.id)) return false;
+    pl.wCells = w; pl.hCells = h;
+    saveBeds();
+    return true;
+  }
 
   function plantEmoji(name) {
     const n = (name || "").toLowerCase();
@@ -846,10 +866,16 @@
   function buildBedSvg(b, interactive) {
     const cols = bedCols(b), rows = bedRows(b);
     const blocked = new Set(b.blocked || []);
+    const rounded = b.shape === "rect" && b.rounded;
+    const rx = rounded ? Math.min(cols, rows) * 0.22 : 0;
+    const clipId = "bedRound-" + b.id;
     const p = [];
     p.push(`<svg class="bed-svg" viewBox="-0.1 -0.1 ${cols + 0.2} ${rows + 0.2}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`);
-    p.push(`<defs><pattern id="hatch" width="0.3" height="0.3" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><rect width="0.3" height="0.3" fill="#e4ddd2"/><line x1="0" y1="0" x2="0" y2="0.3" stroke="#b9ac97" stroke-width="0.14"/></pattern></defs>`);
+    let defs = `<pattern id="hatch" width="0.3" height="0.3" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><rect width="0.3" height="0.3" fill="#e4ddd2"/><line x1="0" y1="0" x2="0" y2="0.3" stroke="#b9ac97" stroke-width="0.14"/></pattern>`;
+    if (rounded) defs += `<clipPath id="${clipId}"><rect x="0" y="0" width="${cols}" height="${rows}" rx="${rx}" ry="${rx}"/></clipPath>`;
+    p.push(`<defs>${defs}</defs>`);
     const raised = b.kind !== "inground";
+    if (rounded) p.push(`<g clip-path="url(#${clipId})">`);
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       if (!inCircle(b, c, r)) continue;
       const isB = blocked.has(c + "," + r);
@@ -858,9 +884,13 @@
       const attrs = interactive ? ` data-col="${c}" data-row="${r}"` : "";
       p.push(`<rect class="bed-cell" x="${c}" y="${r}" width="1" height="1" fill="${fill}" stroke="${stroke}" stroke-width="0.04" vector-effect="non-scaling-stroke"${attrs}></rect>`);
     }
+    if (rounded) p.push(`</g>`);
     if (b.shape === "circle") {
       const R = cols / 2;
       p.push(`<circle cx="${R}" cy="${R}" r="${R}" fill="none" stroke="#8fb37d" stroke-width="0.08" vector-effect="non-scaling-stroke"></circle>`);
+    }
+    if (rounded) {
+      p.push(`<rect x="0" y="0" width="${cols}" height="${rows}" rx="${rx}" ry="${rx}" fill="none" stroke="#8fb37d" stroke-width="0.08" vector-effect="non-scaling-stroke"></rect>`);
     }
     (b.plantings || []).forEach((pl) => {
       const w = pl.wCells || 1, h = pl.hCells || 1;
@@ -1082,13 +1112,16 @@
     width: document.getElementById("bedWidth"),
     length: document.getElementById("bedLength"),
     diameter: document.getElementById("bedDiameter"),
+    rounded: document.getElementById("bedRounded"),
   };
   const rectDims = document.getElementById("rectDims");
   const circleDims = document.getElementById("circleDims");
+  const roundedRow = document.getElementById("roundedRow");
   function syncShapeFields() {
     const circ = bedFields.shape.value === "circle";
     rectDims.hidden = circ;
     circleDims.hidden = !circ;
+    roundedRow.hidden = circ;
   }
   bedFields.shape.addEventListener("change", syncShapeFields);
 
@@ -1103,6 +1136,7 @@
       bedFields.width.value = b.widthFt || 4;
       bedFields.length.value = b.lengthFt || 8;
       bedFields.diameter.value = b.diameterFt || 4;
+      bedFields.rounded.checked = !!b.rounded;
     } else {
       document.getElementById("bedDialogTitle").textContent = "New bed";
       bedFields.id.value = "";
@@ -1126,6 +1160,7 @@
     const widthFt = Math.max(1, Math.min(30, parseInt(bedFields.width.value, 10) || 4));
     const lengthFt = Math.max(1, Math.min(30, parseInt(bedFields.length.value, 10) || 8));
     const diameterFt = Math.max(1, Math.min(30, parseInt(bedFields.diameter.value, 10) || 4));
+    const rounded = shape === "rect" ? bedFields.rounded.checked : false;
     const existing = bedFields.id.value ? beds.find((x) => x.id === bedFields.id.value) : null;
     if (existing) {
       existing.name = name;
@@ -1134,13 +1169,13 @@
         const p = plants.find((x) => x.id === pl.id);
         if (p) p.location = name;
       });
-      applyBedChanges(existing, { shape, widthFt, lengthFt, diameterFt });
+      applyBedChanges(existing, { shape, widthFt, lengthFt, diameterFt, rounded });
       save(); saveBeds();
       currentBedId = existing.id;
     } else {
       const bed = {
         id: uid(), name, kind, shape,
-        widthFt, lengthFt, diameterFt,
+        widthFt, lengthFt, diameterFt, rounded,
         cellIn: CELL_IN, blocked: [], plantings: [],
       };
       beds.push(bed);
@@ -1165,8 +1200,24 @@
     const st = p ? waterStatus(p) : null;
     document.getElementById("pdInfo").textContent =
       `${pl.emoji || "🌱"} ${pl.name} · square-foot spot in ${b.name}.` + (st ? ` ${st.label}.` : "");
+    document.getElementById("pdW").textContent = pl.wCells || 1;
+    document.getElementById("pdH").textContent = pl.hCells || 1;
     pdQty.value = pl.qty || 1;
     plantingDialog.showModal();
+  }
+  function handlePdSize(op) {
+    if (!pdContext) return;
+    const b = beds.find((x) => x.id === pdContext.bedId);
+    const pl = b && (b.plantings || []).find((x) => x.id === pdContext.plantingId);
+    if (!pl) return;
+    let w = pl.wCells || 1, h = pl.hCells || 1;
+    if (op === "w+") w++; else if (op === "w-") w--;
+    else if (op === "h+") h++; else if (op === "h-") h--;
+    if (resizePlanting(b, pl, w, h)) {
+      document.getElementById("pdW").textContent = pl.wCells;
+      document.getElementById("pdH").textContent = pl.hCells;
+      if (currentBedId === b.id) renderBedEditor(b);
+    }
   }
   pdQty.addEventListener("change", () => {
     if (!pdContext) return;
@@ -1179,6 +1230,8 @@
   });
   plantingDialog.addEventListener("click", (e) => {
     if (e.target === plantingDialog) { plantingDialog.close(); return; }
+    const sizeBtn = e.target.closest("[data-pd-size]");
+    if (sizeBtn) { handlePdSize(sizeBtn.getAttribute("data-pd-size")); return; }
     const btn = e.target.closest("[data-pd]");
     if (!btn) return;
     const act = btn.getAttribute("data-pd");

@@ -235,6 +235,8 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 #plantForm label, #bedForm label { display: grid; gap: 0.3rem; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
 #plantForm .row, #bedForm .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
 #bedForm [hidden] { display: none !important; }
+#bedForm label.bed-check { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+#bedForm label.bed-check input { width: auto; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin: 0.4rem 0 0; padding: 0; }
 
 .settings-body { padding: 1.25rem; }
@@ -283,5 +285,6 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .bed-summary { text-align: center; font-size: 0.82rem; margin: 0.7rem 0 0; }
 
 .pd-qty { display: grid; gap: 0.3rem; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.pd-size { display: flex; gap: 1rem; flex-wrap: wrap; }
 .pd-qty input { width: 6rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
 .pd-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
