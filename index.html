@@ -19,7 +19,12 @@
     <p class="tagline">Private &amp; offline — your data never leaves this device.</p>
   </header>
 
-  <main>
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-view="garden" role="tab">🪴 My Garden</button>
+    <button class="tab" data-view="guide" role="tab">📅 Planting Guide</button>
+  </nav>
+
+  <main id="gardenView">
     <section class="toolbar">
       <button id="addBtn" class="primary">+ Add plant</button>
       <div class="filters">
@@ -46,6 +51,44 @@
         <input type="file" id="importFile" accept="application/json" hidden />
       </div>
     </section>
+  </main>
+
+  <main id="guideView" hidden>
+    <section class="zone-bar">
+      <label for="zone"><strong>Your USDA zone</strong>
+        <select id="zone">
+          <option value="">Select your zone…</option>
+          <option value="1">Zone 1 (coldest)</option>
+          <option value="2">Zone 2</option>
+          <option value="3">Zone 3</option>
+          <option value="4">Zone 4</option>
+          <option value="5">Zone 5</option>
+          <option value="6">Zone 6</option>
+          <option value="7">Zone 7</option>
+          <option value="8">Zone 8</option>
+          <option value="9">Zone 9</option>
+          <option value="10">Zone 10</option>
+          <option value="11">Zone 11</option>
+          <option value="12">Zone 12</option>
+          <option value="13">Zone 13 (warmest)</option>
+        </select>
+      </label>
+      <p class="muted" id="zoneHint">Not sure? Look up your zone by ZIP at the USDA Plant Hardiness Zone Map. Planting months adjust to your zone.</p>
+    </section>
+
+    <section class="toolbar">
+      <input type="search" id="guideSearch" placeholder="Search plants…" aria-label="Search plants" />
+      <div class="filters">
+        <label for="guideFilter">Show:</label>
+        <select id="guideFilter">
+          <option value="all">All plants</option>
+          <option value="now">Plant this month</option>
+        </select>
+      </div>
+    </section>
+
+    <section id="guideList" class="plant-list" aria-live="polite"></section>
+    <p id="guideEmpty" class="empty" hidden></p>
   </main>
 
   <!-- Add/Edit dialog -->
@@ -91,6 +134,7 @@
     </form>
   </dialog>
 
+  <script src="garden-data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

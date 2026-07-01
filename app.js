@@ -244,5 +244,183 @@
     });
   }
 
+  // ===================== Planting Guide =====================
+  const DATA = window.GARDEN_DATA || { ZONE_FROST: {}, PLANTS: [] };
+  const ZONE_KEY = "garden.zone.v1";
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  const views = {
+    garden: document.getElementById("gardenView"),
+    guide: document.getElementById("guideView"),
+  };
+  const tabs = document.querySelectorAll(".tab");
+  const zoneSel = document.getElementById("zone");
+  const guideSearch = document.getElementById("guideSearch");
+  const guideFilter = document.getElementById("guideFilter");
+  const guideListEl = document.getElementById("guideList");
+  const guideEmptyEl = document.getElementById("guideEmpty");
+
+  let currentZone = localStorage.getItem(ZONE_KEY) || "";
+  if (currentZone) zoneSel.value = currentZone;
+
+  tabs.forEach((t) => t.addEventListener("click", () => switchView(t.dataset.view)));
+  function switchView(name) {
+    tabs.forEach((t) => t.classList.toggle("active", t.dataset.view === name));
+    views.garden.hidden = name !== "garden";
+    views.guide.hidden = name !== "guide";
+    if (name === "guide") renderGuide();
+  }
+
+  zoneSel.addEventListener("change", () => {
+    currentZone = zoneSel.value;
+    localStorage.setItem(ZONE_KEY, currentZone);
+    renderGuide();
+  });
+  guideSearch.addEventListener("input", renderGuide);
+  guideFilter.addEventListener("change", renderGuide);
+
+  // Reference (non-leap) year so month math is stable.
+  const REF_YEAR = 2025;
+  function anchorDate(zone, anchor) {
+    const z = DATA.ZONE_FROST[zone];
+    if (!z || z.frostFree) return null;
+    const md = anchor === "firstFall" ? z.firstFall : z.lastFrost;
+    return new Date(REF_YEAR, md[0] - 1, md[1]);
+  }
+
+  // Returns array of month indices (0-11) covered by a method for a zone.
+  function methodMonths(method, zone) {
+    const base = anchorDate(zone, method.anchor);
+    if (!base) return null; // frost-free
+    const start = new Date(base.getTime() + method.startWk * 7 * 86400000);
+    const end = new Date(base.getTime() + method.endWk * 7 * 86400000);
+    const months = new Set();
+    const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    const last = new Date(end.getFullYear(), end.getMonth(), 1);
+    while (cur <= last) {
+      months.add(cur.getMonth());
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    return [...months];
+  }
+
+  function monthsLabel(monthIdxs) {
+    if (!monthIdxs || monthIdxs.length === 0) return "—";
+    const sorted = [...monthIdxs].sort((a, b) => a - b);
+    if (sorted.length === 1) return MONTHS[sorted[0]];
+    return `${MONTHS[sorted[0]]}–${MONTHS[sorted[sorted.length - 1]]}`;
+  }
+
+  function plantMonthSet(plant, zone) {
+    const all = new Set();
+    plant.methods.forEach((m) => {
+      const mm = methodMonths(m, zone);
+      if (mm) mm.forEach((x) => all.add(x));
+    });
+    return all;
+  }
+
+  function renderGuide() {
+    const q = (guideSearch.value || "").trim().toLowerCase();
+    const filter = guideFilter.value;
+    const thisMonth = new Date().getMonth();
+    const hasZone = currentZone && DATA.ZONE_FROST[currentZone];
+    const frostFree = hasZone && DATA.ZONE_FROST[currentZone].frostFree;
+
+    let items = DATA.PLANTS.filter((p) => {
+      if (!q) return true;
+      return (p.name + " " + p.crop + " " + p.latin).toLowerCase().includes(q);
+    });
+
+    if (filter === "now" && hasZone && !frostFree) {
+      items = items.filter((p) => plantMonthSet(p, currentZone).has(thisMonth));
+    }
+
+    guideListEl.innerHTML = items.map((p) => guideCardHtml(p, hasZone, frostFree, thisMonth)).join("");
+
+    if (items.length === 0) {
+      guideEmptyEl.hidden = false;
+      guideEmptyEl.textContent = q
+        ? "No plants match your search."
+        : (filter === "now" ? "Nothing to plant this month for your zone. 🌱" : "No plants yet.");
+    } else {
+      guideEmptyEl.hidden = true;
+    }
+  }
+
+  function guideCardHtml(p, hasZone, frostFree, thisMonth) {
+    const nowBadge = (hasZone && !frostFree && plantMonthSet(p, currentZone).has(thisMonth))
+      ? `<span class="badge thirsty">Plant now</span>` : "";
+
+    let timing;
+    if (!hasZone) {
+      timing = `<p class="muted">Select your zone above to see planting months.</p>`;
+    } else if (frostFree) {
+      timing = `<p class="meta"><span>🌡️ Frost-free zone — warm-season crops can be sown in most months; cool-season crops do best in the cooler months.</span></p>`;
+    } else {
+      timing = `<ul class="timing">` + p.methods.map((m) => {
+        const mm = methodMonths(m, currentZone);
+        const isNow = mm && mm.includes(thisMonth);
+        return `<li${isNow ? ' class="now"' : ""}><strong>${escapeHtml(m.type)}:</strong> ${monthsLabel(mm)}${isNow ? " • now" : ""}</li>`;
+      }).join("") + `</ul>`;
+    }
+
+    const facts = [];
+    if (p.daysToMaturity) facts.push(`<span>⏱️ ${p.daysToMaturity} days to harvest</span>`);
+    if (p.perennial) facts.push(`<span>♻️ Perennial</span>`);
+    if (p.sun) facts.push(`<span>☀️ ${escapeHtml(p.sun)}</span>`);
+    if (p.spacingIn) facts.push(`<span>↔️ ${p.spacingIn}&quot; apart</span>`);
+    if (p.depthIn) facts.push(`<span>🕳️ ${p.depthIn}&quot; deep</span>`);
+    if (p.germDays) facts.push(`<span>🌱 Germ ${p.germDays}d</span>`);
+
+    const src = (p.sources || []).map((s) =>
+      s.url ? `<a href="${s.url}" target="_blank" rel="noopener">${escapeHtml(s.name)}</a>` : escapeHtml(s.name)
+    ).join(", ");
+
+    return `
+      <article class="card guide-card" data-id="${p.id}">
+        <div class="card-top">
+          <h3>${escapeHtml(p.name)}</h3>
+          ${nowBadge}
+        </div>
+        <p class="latin">${escapeHtml(p.crop)} · <em>${escapeHtml(p.latin)}</em></p>
+        ${timing}
+        ${facts.length ? `<p class="meta">${facts.join("")}</p>` : ""}
+        ${p.tips ? `<p class="notes">${escapeHtml(p.tips)}</p>` : ""}
+        ${src ? `<p class="source">📖 Source: ${src}${p.sources[0].retrieved ? ` <span class="muted">(${p.sources[0].retrieved})</span>` : ""}</p>` : ""}
+        <div class="card-actions">
+          <button class="water-btn" data-act="add">+ Add to my garden</button>
+        </div>
+      </article>`;
+  }
+
+  guideListEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-act='add']");
+    if (!btn) return;
+    const id = e.target.closest(".card").dataset.id;
+    const gp = DATA.PLANTS.find((p) => p.id === id);
+    if (gp) openDialogFromGuide(gp);
+  });
+
+  function openDialogFromGuide(gp) {
+    form.reset();
+    dialogTitle.textContent = "Add plant";
+    f.id.value = "";
+    f.name.value = gp.name;
+    f.location.value = "";
+    f.planted.value = todayStr();
+    f.interval.value = 3;
+    f.sun.value = ["Full sun", "Partial sun", "Shade"].includes(gp.sun) ? gp.sun : "";
+    const noteParts = [];
+    noteParts.push(`${gp.crop} (${gp.latin}).`);
+    if (gp.daysToMaturity) noteParts.push(`~${gp.daysToMaturity} days to harvest.`);
+    if (gp.spacingIn) noteParts.push(`Space ${gp.spacingIn}" apart.`);
+    if (gp.tips) noteParts.push(gp.tips);
+    if (gp.sources && gp.sources[0]) noteParts.push(`Source: ${gp.sources[0].name}.`);
+    f.notes.value = noteParts.join(" ");
+    dialog.showModal();
+    f.name.focus();
+  }
+
   render();
 })();
