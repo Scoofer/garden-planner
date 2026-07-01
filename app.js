@@ -826,7 +826,7 @@
     b.plantings = b.plantings || [];
     b.plantings.push({
       id: plant.id, col, row, wCells: g.w, hCells: g.h,
-      name: meta.name, guideId: meta.guideId || null, qty: g.qty, emoji: plantEmoji(meta.name),
+      name: meta.name, guideId: meta.guideId || null, qty: 1, emoji: plantEmoji(meta.name),
     });
     save(); saveBeds();
     return true;
@@ -972,7 +972,7 @@
     if (armedTool.kind === "block") return "🧱 Tap squares to mark paths/bricks (non-plantable). Tap a blocked square to clear it.";
     if (armedTool.kind === "plant") {
       const g = plantGeom(armedTool.meta.spacingIn);
-      const cap = g.w > 1 || g.h > 1 ? `spans ${g.w}×${g.h} squares` : `${g.qty} per square`;
+      const cap = g.w > 1 || g.h > 1 ? `spans ${g.w}×${g.h} squares` : `fits up to ${g.qty} per square`;
       return `Placing ${escapeHtml(armedTool.meta.name)} (${cap}) — tap a square.`;
     }
     return "Tap a plant to edit it. Pick a plant below to place it, or use 🧱 to add paths.";
