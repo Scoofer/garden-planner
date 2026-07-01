@@ -719,6 +719,7 @@
   let beds = loadJson(BEDS_KEY, []);
   let currentBedId = null;
   let armedTool = { kind: "select" };
+  let bedResizeMode = false;
 
   function saveBeds() { localStorage.setItem(BEDS_KEY, JSON.stringify(beds)); }
   function currentBed() { return beds.find((b) => b.id === currentBedId) || null; }
@@ -895,7 +896,7 @@
   }
 
   // --- SVG grid ---
-  function buildBedSvg(b, interactive, conflictIds) {
+  function buildBedSvg(b, interactive, conflictIds, showHandles) {
     const cols = bedCols(b), rows = bedRows(b);
     const blocked = new Set(b.blocked || []);
     const conflicts = conflictIds || new Set();
@@ -934,7 +935,7 @@
       p.push(`<text x="${x0 + w / 2}" y="${y0 + h / 2}" text-anchor="middle" dy="0.35em" font-size="${Math.min(w, h) * 0.52}">${pl.emoji || "🌱"}</text>`);
       if (pl.qty > 1) p.push(`<text x="${x0 + w - 0.12}" y="${y0 + h - 0.14}" text-anchor="end" dominant-baseline="central" font-size="0.24" fill="#3a5a2c">×${pl.qty}</text>`);
       if (conflicts.has(pl.id)) p.push(`<rect x="${x0 + 0.02}" y="${y0 + 0.02}" width="${w - 0.04}" height="${h - 0.04}" rx="0.14" fill="none" stroke="#e6893a" stroke-width="0.08" stroke-dasharray="0.16 0.12" vector-effect="non-scaling-stroke" pointer-events="none"></rect>`);
-      if (interactive) p.push(`<rect class="pl-handle" data-resize-planting="${pl.id}" x="${x0 + w - 0.3}" y="${y0 + h - 0.3}" width="0.28" height="0.28" rx="0.06" fill="#5a9247" stroke="#ffffff" stroke-width="0.035" vector-effect="non-scaling-stroke"></rect>`);
+      if (interactive && showHandles) p.push(`<rect class="pl-handle" data-resize-planting="${pl.id}" x="${x0 + w - 0.3}" y="${y0 + h - 0.3}" width="0.28" height="0.28" rx="0.06" fill="#5a9247" stroke="#ffffff" stroke-width="0.035" vector-effect="non-scaling-stroke"></rect>`);
       p.push(`</g>`);
     });
     if (needClip) p.push(`</g>`);
@@ -1016,6 +1017,7 @@
   }
 
   function toolHint(b) {
+    if (bedResizeMode) return "📐 Resize mode on — drag the corner handle of a plant to change its footprint. Toggle off for a clean view.";
     if (armedTool.kind === "block") return "🧱 Tap squares to mark paths/bricks (non-plantable). Tap a blocked square to clear it.";
     if (armedTool.kind === "plant") {
       const g = plantGeom(armedTool.meta.spacingIn);
@@ -1051,9 +1053,10 @@
       </div>
       <div class="bed-resize">${resize}</div>
       <div class="bed-palette">${paletteHtml()}</div>
+      <div class="bed-actions"><button class="chip ${bedResizeMode ? "on" : ""}" data-bed-act="toggleresize">📐 Resize plants: ${bedResizeMode ? "On" : "Off"}</button></div>
       <p class="bed-hint">${toolHint(b)}</p>
       ${warnHtml}
-      <div class="bed-grid-wrap">${buildBedSvg(b, true, conflictIds)}</div>
+      <div class="bed-grid-wrap">${buildBedSvg(b, true, conflictIds, bedResizeMode)}</div>
       <p class="bed-summary muted">🟩 ${s.used}/${s.usable} squares used · 🌱 ${s.plantings} planting${s.plantings === 1 ? "" : "s"}${s.blocked ? ` · 🧱 ${s.blocked} path` : ""}</p>`;
   }
 
@@ -1224,7 +1227,8 @@
   function handleBedAct(a) {
     const b = currentBed();
     if (a === "newbed") openBedDialog(null);
-    else if (a === "back") { currentBedId = null; renderBeds(); }
+    else if (a === "back") { currentBedId = null; bedResizeMode = false; renderBeds(); }
+    else if (a === "toggleresize" && b) { bedResizeMode = !bedResizeMode; renderBedEditor(b); }
     else if (a === "editbed" && b) openBedDialog(b);
     else if (a === "deletebed" && b) {
       const s = bedStats(b);

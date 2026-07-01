@@ -283,6 +283,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .bed-cell { cursor: pointer; }
 .bed-planting { cursor: grab; touch-action: none; }
 .bed-planting:active { cursor: grabbing; }
+.bed-actions { margin: 0.1rem 0 0.4rem; }
 .pl-handle { cursor: nwse-resize; touch-action: none; }
 .bed-warn { background: #fbecd9; border: 1px solid #e6893a; color: #8a4b16; border-radius: 8px; padding: 0.5rem 0.7rem; margin: 0 0 0.6rem; font-size: 0.82rem; }
 .bed-summary { text-align: center; font-size: 0.82rem; margin: 0.7rem 0 0; }
