@@ -202,6 +202,7 @@
     } else {
       summaryEl.hidden = true;
     }
+    if (typeof updateBackupBanner === "function") updateBackupBanner();
   }
 
   function cardHtml(p) {
@@ -415,7 +416,9 @@
     }
 
     if (!backupBanner) return;
-    const hasData = plants.length > 0 || beds.length > 0;
+    let bedCount = 0;
+    try { bedCount = beds.length; } catch (e) { /* beds not yet initialized */ }
+    const hasData = plants.length > 0 || bedCount > 0;
     const snoozeUntil = parseInt(localStorage.getItem(BACKUP_SNOOZE_KEY) || "", 10);
     const snoozed = !isNaN(snoozeUntil) && Date.now() < snoozeUntil;
     const stale = !hasBackup || (Date.now() - lastAt) >= BACKUP_REMIND_DAYS * MS_PER_DAY;
@@ -1306,6 +1309,7 @@
   function renderBeds() {
     const b = currentBed();
     if (b) renderBedEditor(b); else { currentBedId = null; renderBedList(); }
+    if (typeof updateBackupBanner === "function") updateBackupBanner();
   }
 
   function renderBedList() {
