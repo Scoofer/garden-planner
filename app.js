@@ -726,11 +726,15 @@
   // --- geometry ---
   function bedCols(b) {
     const ft = b.shape === "circle" ? b.diameterFt : b.widthFt;
-    return Math.max(1, Math.round((ft || 1) * 12 / CELL_IN));
+    let n = Math.max(1, Math.round((ft || 1) * 12 / CELL_IN));
+    if (b.border && b.shape !== "circle") n = Math.max(1, n - 1);
+    return n;
   }
   function bedRows(b) {
     const ft = b.shape === "circle" ? b.diameterFt : b.lengthFt;
-    return Math.max(1, Math.round((ft || 1) * 12 / CELL_IN));
+    let n = Math.max(1, Math.round((ft || 1) * 12 / CELL_IN));
+    if (b.border && b.shape !== "circle") n = Math.max(1, n - 1);
+    return n;
   }
   function inCircle(b, c, r) {
     if (b.shape !== "circle") return true;
@@ -866,39 +870,48 @@
   function buildBedSvg(b, interactive) {
     const cols = bedCols(b), rows = bedRows(b);
     const blocked = new Set(b.blocked || []);
-    const rounded = b.shape === "rect" && b.rounded;
-    const rx = rounded ? Math.min(cols, rows) * 0.22 : 0;
+    const rect = b.shape === "rect";
+    const rounded = rect && b.rounded;
+    const off = rect && b.border ? 0.5 : 0; // 6" inset border = half a 12" cell
+    const outerW = cols + 2 * off, outerH = rows + 2 * off;
+    const rx = rounded ? Math.min(outerW, outerH) * 0.22 : 0;
     const clipId = "bedRound-" + b.id;
-    const p = [];
-    p.push(`<svg class="bed-svg" viewBox="-0.1 -0.1 ${cols + 0.2} ${rows + 0.2}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`);
-    let defs = `<pattern id="hatch" width="0.3" height="0.3" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><rect width="0.3" height="0.3" fill="#e4ddd2"/><line x1="0" y1="0" x2="0" y2="0.3" stroke="#b9ac97" stroke-width="0.14"/></pattern>`;
-    if (rounded) defs += `<clipPath id="${clipId}"><rect x="0" y="0" width="${cols}" height="${rows}" rx="${rx}" ry="${rx}"/></clipPath>`;
-    p.push(`<defs>${defs}</defs>`);
+    const needClip = rounded && off === 0;
     const raised = b.kind !== "inground";
-    if (rounded) p.push(`<g clip-path="url(#${clipId})">`);
+    const p = [];
+    p.push(`<svg class="bed-svg" viewBox="-0.1 -0.1 ${outerW + 0.2} ${outerH + 0.2}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`);
+    let defs = `<pattern id="hatch" width="0.3" height="0.3" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><rect width="0.3" height="0.3" fill="#e4ddd2"/><line x1="0" y1="0" x2="0" y2="0.3" stroke="#b9ac97" stroke-width="0.14"/></pattern>`;
+    if (needClip) defs += `<clipPath id="${clipId}"><rect x="0" y="0" width="${cols}" height="${rows}" rx="${rx}" ry="${rx}"/></clipPath>`;
+    p.push(`<defs>${defs}</defs>`);
+    // Bed backdrop: when there's a border margin, this fills the frame area around the grid.
+    if (off > 0) {
+      p.push(`<rect x="0" y="0" width="${outerW}" height="${outerH}" rx="${rx}" ry="${rx}" fill="${raised ? "#efe7d6" : "#e8ddc6"}" stroke="#8fb37d" stroke-width="0.08" vector-effect="non-scaling-stroke"></rect>`);
+    }
+    if (needClip) p.push(`<g clip-path="url(#${clipId})">`);
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       if (!inCircle(b, c, r)) continue;
       const isB = blocked.has(c + "," + r);
       const fill = isB ? "url(#hatch)" : (raised ? "#ffffff" : "#f4efe3");
       const stroke = raised ? "#c3d4b8" : "#d9cdb2";
       const attrs = interactive ? ` data-col="${c}" data-row="${r}"` : "";
-      p.push(`<rect class="bed-cell" x="${c}" y="${r}" width="1" height="1" fill="${fill}" stroke="${stroke}" stroke-width="0.04" vector-effect="non-scaling-stroke"${attrs}></rect>`);
+      p.push(`<rect class="bed-cell" x="${off + c}" y="${off + r}" width="1" height="1" fill="${fill}" stroke="${stroke}" stroke-width="0.04" vector-effect="non-scaling-stroke"${attrs}></rect>`);
     }
-    if (rounded) p.push(`</g>`);
+    if (needClip) p.push(`</g>`);
     if (b.shape === "circle") {
       const R = cols / 2;
       p.push(`<circle cx="${R}" cy="${R}" r="${R}" fill="none" stroke="#8fb37d" stroke-width="0.08" vector-effect="non-scaling-stroke"></circle>`);
     }
-    if (rounded) {
+    if (rounded && off === 0) {
       p.push(`<rect x="0" y="0" width="${cols}" height="${rows}" rx="${rx}" ry="${rx}" fill="none" stroke="#8fb37d" stroke-width="0.08" vector-effect="non-scaling-stroke"></rect>`);
     }
     (b.plantings || []).forEach((pl) => {
       const w = pl.wCells || 1, h = pl.hCells || 1;
+      const x0 = off + pl.col, y0 = off + pl.row;
       const attrs = interactive ? ` data-planting="${pl.id}"` : "";
       p.push(`<g class="bed-planting"${attrs}>`);
-      p.push(`<rect x="${pl.col + 0.07}" y="${pl.row + 0.07}" width="${w - 0.14}" height="${h - 0.14}" rx="0.12" fill="#e5f2df" stroke="#5a9247" stroke-width="0.05" vector-effect="non-scaling-stroke"></rect>`);
-      p.push(`<text x="${pl.col + w / 2}" y="${pl.row + h / 2}" text-anchor="middle" dominant-baseline="central" font-size="${Math.min(w, h) * 0.52}">${pl.emoji || "🌱"}</text>`);
-      if (pl.qty > 1) p.push(`<text x="${pl.col + w - 0.12}" y="${pl.row + h - 0.14}" text-anchor="end" dominant-baseline="central" font-size="0.24" fill="#3a5a2c">×${pl.qty}</text>`);
+      p.push(`<rect x="${x0 + 0.07}" y="${y0 + 0.07}" width="${w - 0.14}" height="${h - 0.14}" rx="0.12" fill="#e5f2df" stroke="#5a9247" stroke-width="0.05" vector-effect="non-scaling-stroke"></rect>`);
+      p.push(`<text x="${x0 + w / 2}" y="${y0 + h / 2}" text-anchor="middle" dominant-baseline="central" font-size="${Math.min(w, h) * 0.52}">${pl.emoji || "🌱"}</text>`);
+      if (pl.qty > 1) p.push(`<text x="${x0 + w - 0.12}" y="${y0 + h - 0.14}" text-anchor="end" dominant-baseline="central" font-size="0.24" fill="#3a5a2c">×${pl.qty}</text>`);
       p.push(`</g>`);
     });
     p.push(`</svg>`);
@@ -1113,15 +1126,18 @@
     length: document.getElementById("bedLength"),
     diameter: document.getElementById("bedDiameter"),
     rounded: document.getElementById("bedRounded"),
+    border: document.getElementById("bedBorder"),
   };
   const rectDims = document.getElementById("rectDims");
   const circleDims = document.getElementById("circleDims");
   const roundedRow = document.getElementById("roundedRow");
+  const borderRow = document.getElementById("borderRow");
   function syncShapeFields() {
     const circ = bedFields.shape.value === "circle";
     rectDims.hidden = circ;
     circleDims.hidden = !circ;
     roundedRow.hidden = circ;
+    borderRow.hidden = circ;
   }
   bedFields.shape.addEventListener("change", syncShapeFields);
 
@@ -1137,6 +1153,7 @@
       bedFields.length.value = b.lengthFt || 8;
       bedFields.diameter.value = b.diameterFt || 4;
       bedFields.rounded.checked = !!b.rounded;
+      bedFields.border.checked = !!b.border;
     } else {
       document.getElementById("bedDialogTitle").textContent = "New bed";
       bedFields.id.value = "";
@@ -1161,6 +1178,7 @@
     const lengthFt = Math.max(1, Math.min(30, parseInt(bedFields.length.value, 10) || 8));
     const diameterFt = Math.max(1, Math.min(30, parseInt(bedFields.diameter.value, 10) || 4));
     const rounded = shape === "rect" ? bedFields.rounded.checked : false;
+    const border = shape === "rect" ? bedFields.border.checked : false;
     const existing = bedFields.id.value ? beds.find((x) => x.id === bedFields.id.value) : null;
     if (existing) {
       existing.name = name;
@@ -1169,13 +1187,13 @@
         const p = plants.find((x) => x.id === pl.id);
         if (p) p.location = name;
       });
-      applyBedChanges(existing, { shape, widthFt, lengthFt, diameterFt, rounded });
+      applyBedChanges(existing, { shape, widthFt, lengthFt, diameterFt, rounded, border });
       save(); saveBeds();
       currentBedId = existing.id;
     } else {
       const bed = {
         id: uid(), name, kind, shape,
-        widthFt, lengthFt, diameterFt, rounded,
+        widthFt, lengthFt, diameterFt, rounded, border,
         cellIn: CELL_IN, blocked: [], plantings: [],
       };
       beds.push(bed);
