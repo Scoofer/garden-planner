@@ -189,6 +189,54 @@
     return { ready, daysLeft, dtm, cues: gp && gp.harvest ? gp.harvest.cues : "" };
   }
 
+  // Season-based harvest for perennials/crops picked on a calendar window
+  // (e.g. asparagus in spring) rather than a days-to-maturity countdown.
+  function seasonWindow(hs, zone, year) {
+    const z = DATA.ZONE_FROST[zone];
+    if (!z || z.frostFree) return null;
+    const md = hs.anchor === "firstFall" ? z.firstFall : z.lastFrost;
+    const base = new Date(year, md[0] - 1, md[1]);
+    return {
+      start: new Date(base.getTime() + hs.startWk * 7 * MS_PER_DAY),
+      end: new Date(base.getTime() + hs.endWk * 7 * MS_PER_DAY),
+    };
+  }
+  // Pure core: given a harvestSeason, zone, planted date, and "today", classify.
+  function seasonHarvestFor(hs, zone, planted, today) {
+    if (!hs) return null;
+    let year = today.getFullYear();
+    let w = seasonWindow(hs, zone, year);
+    if (!w) return null;
+    const t0 = new Date(today); t0.setHours(0, 0, 0, 0);
+    if (t0 > w.end) { year += 1; w = seasonWindow(hs, zone, year); }
+    const start0 = new Date(w.start); start0.setHours(0, 0, 0, 0);
+    const end0 = new Date(w.end); end0.setHours(0, 0, 0, 0);
+    let firstHarvestYear = null;
+    if (hs.establishYears && planted) {
+      const pd = parseLocalDate(planted);
+      if (pd && !isNaN(pd.getTime())) firstHarvestYear = pd.getFullYear() + hs.establishYears;
+    }
+    const base = { year, start: w.start, end: w.end, firstHarvestYear };
+    if (firstHarvestYear && year < firstHarvestYear) return Object.assign(base, { state: "establishing" });
+    if (t0 >= start0 && t0 <= end0) return Object.assign(base, { state: "ready" });
+    const daysToStart = Math.round((start0.getTime() - t0.getTime()) / MS_PER_DAY);
+    if (daysToStart > 0 && daysToStart <= 14) return Object.assign(base, { state: "soon", daysToStart });
+    return Object.assign(base, { state: "upcoming", daysToStart });
+  }
+  // Wrapper for a tracked plant using the current zone and today.
+  function seasonHarvest(p) {
+    if (!p) return null;
+    const gp = guidePlantFor(p);
+    const hs = (p.harvestSeason) || (gp && gp.harvestSeason);
+    if (!hs) return null;
+    const z = DATA.ZONE_FROST[currentZone];
+    if (!currentZone || !z || z.frostFree) return null;
+    const res = seasonHarvestFor(hs, currentZone, p.planted, new Date());
+    if (!res) return null;
+    res.cues = (gp && gp.harvest && gp.harvest.cues) || (p.harvest && p.harvest.cues) || "";
+    return res;
+  }
+
   // --- Rendering ---
   function render() {
     renderWeatherPanel();
@@ -242,6 +290,7 @@
       : "";
 
     const harv = harvestEstimate(p);
+    const season = harv ? null : seasonHarvest(p);
     let harvestNote = "", harvestClass = "", harvestBadge = "";
     if (harv) {
       const readyStr = harv.ready.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -253,6 +302,23 @@
         harvestNote = `<p class="harvest-note ready">🧺 Harvest window open <span class="muted">(est. matured ${readyStr})</span>${harv.cues ? `<br><span class="cue">${escapeHtml(harv.cues)}</span>` : ""}</p>`;
         harvestClass = " harvest-ready";
         harvestBadge = `<span class="badge harvest-ready">🧺 Ready to harvest</span>`;
+      }
+    } else if (season) {
+      const startStr = season.start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const endStr = season.end.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+      const cueHtml = season.cues ? `<br><span class="cue">${escapeHtml(season.cues)}</span>` : "";
+      if (season.state === "establishing") {
+        harvestNote = `<p class="harvest-note">🌱 Establishing — first harvest spring ${season.firstHarvestYear}. <span class="muted">Let the crowns build for now.</span></p>`;
+      } else if (season.state === "ready") {
+        harvestNote = `<p class="harvest-note ready">🧺 In harvest season <span class="muted">(through ${endStr})</span>${cueHtml}</p>`;
+        harvestClass = " harvest-ready";
+        harvestBadge = `<span class="badge harvest-ready">🧺 Ready to harvest</span>`;
+      } else if (season.state === "soon") {
+        harvestNote = `<p class="harvest-note soon">🧺 Harvest season starts in ~${season.daysToStart} day${season.daysToStart === 1 ? "" : "s"} <span class="muted">(around ${startStr})</span>${cueHtml}</p>`;
+        harvestClass = " harvest-soon";
+        harvestBadge = `<span class="badge harvest-soon">🧺 Harvest soon</span>`;
+      } else {
+        harvestNote = `<p class="harvest-note">🧺 Spring harvest season <span class="muted">(~${startStr} – ${endStr})</span></p>`;
       }
     }
 
@@ -592,6 +658,14 @@
     return `${MONTHS[sorted[0]]}–${MONTHS[sorted[sorted.length - 1]]}`;
   }
 
+  // Month/day range label for a season-harvest window (year-agnostic display).
+  function seasonGuideLabel(hs, zone) {
+    const w = seasonWindow(hs, zone, REF_YEAR);
+    if (!w) return null;
+    const f = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return `${f(w.start)} – ${f(w.end)}`;
+  }
+
   function plantMonthSet(plant, zone) {
     const all = new Set();
     (plant.methods || []).forEach((m) => {
@@ -750,6 +824,7 @@
     const harvestBlock = p.harvest ? `
         <div class="harvest-guide">
           <h4>🧺 Harvesting</h4>
+          ${p.harvestSeason && hasZone && !frostFree && seasonGuideLabel(p.harvestSeason, currentZone) ? `<p><strong>Season (Zone ${escapeHtml(currentZone.toUpperCase())}):</strong> ${seasonGuideLabel(p.harvestSeason, currentZone)}${p.harvestSeason.establishYears ? ` <span class="muted">— starts ${p.harvestSeason.establishYears} yr${p.harvestSeason.establishYears === 1 ? "" : "s"} after planting</span>` : ""}</p>` : ""}
           ${p.harvest.cues ? `<p><strong>When it's ready:</strong> ${escapeHtml(p.harvest.cues)}</p>` : ""}
           ${p.harvest.how ? `<p><strong>How to pick:</strong> ${escapeHtml(p.harvest.how)}</p>` : ""}
           ${p.harvest.storage ? `<p><strong>Storing:</strong> ${escapeHtml(p.harvest.storage)}</p>` : ""}
@@ -1926,7 +2001,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest };
   }
 
   render();

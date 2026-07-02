@@ -217,6 +217,7 @@ window.GARDEN_DATA = (function () {
       crop: "Asparagus", latin: "Asparagus officinalis",
       sun: "Full sun", spacingIn: 18, rowIn: 48, depthIn: 6,
       daysToMaturity: null, germDays: "14–21", perennial: true,
+      harvestSeason: { anchor: "lastFrost", startWk: -1, endWk: 6, establishYears: 2 },
       methods: [
         { type: "Plant crowns / transplant", anchor: "lastFrost", startWk: -2, endWk: 4 },
       ],
