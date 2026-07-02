@@ -156,6 +156,7 @@ window.GARDEN_DATA = (function () {
       sun: "Full sun", spacingIn: 12, rowIn: 36, depthIn: 0.5,
       daysToMaturity: 60, germDays: "7–14", perennial: false,
       climate: { heatF: 92, cat: "tough", humid: true },
+      succession: { intervalDays: 28, sowAnchor: "lastFrost", sowStartWk: 0, frostTolDays: 0, note: "A fresh planting every few weeks steps in as older vines slow down or get hit by mildew, stretching your harvest into fall. In a small garden, even one follow-up sowing keeps cucumbers coming." },
       methods: [
         { type: "Start indoors", anchor: "lastFrost", startWk: -3, endWk: -2 },
         { type: "Direct sow / transplant", anchor: "lastFrost", startWk: 0, endWk: 4 },
@@ -196,6 +197,7 @@ window.GARDEN_DATA = (function () {
       sun: "Full sun", spacingIn: 2.5, rowIn: 12, depthIn: 0.25,
       daysToMaturity: 75, germDays: "14–28", perennial: false,
       climate: { heatF: 85, cat: "cool", humid: false },
+      succession: { intervalDays: 21, sowAnchor: "lastFrost", sowStartWk: -4, frostTolDays: 21, note: "Carrots hold well in the ground, so sow a short row every few weeks for a steady supply rather than one big crop that matures all at once. The last sowings sweeten after fall frosts and store for months." },
       methods: [
         { type: "Direct sow (spring)", anchor: "lastFrost", startWk: -4, endWk: 2 },
         { type: "Direct sow (fall)", anchor: "firstFall", startWk: -11, endWk: -8 },
@@ -216,6 +218,7 @@ window.GARDEN_DATA = (function () {
       sun: "Full sun", spacingIn: 4, rowIn: 30, depthIn: 1.25,
       daysToMaturity: 58, germDays: "7–10", perennial: false,
       climate: { heatF: 90, cat: "fruit", humid: true },
+      succession: { intervalDays: 14, sowAnchor: "lastFrost", sowStartWk: 0, frostTolDays: 0, note: "Bush beans crop heavily for a couple of weeks and then fade — sow a new short row every 2 weeks to keep fresh, tender beans coming right up until the first fall frost." },
       methods: [
         { type: "Direct sow", anchor: "lastFrost", startWk: 0, endWk: 6 },
       ],

@@ -252,7 +252,42 @@
     return res;
   }
 
-  // --- Heat / humidity climate warnings -------------------------------------
+  // --- Succession sowing planner (planning calendar) ------------------------
+  // Given a crop's succession profile, zone frost dates, and days-to-maturity,
+  // compute the full-season sowing schedule: first/last safe sow dates, how many
+  // sowings fit at the chosen interval, and the next sowing due on/after today.
+  function successionPlanFor(sc, zone, dtm, today) {
+    if (!sc) return null;
+    const z = DATA.ZONE_FROST[zone];
+    if (!z || z.frostFree || !z.lastFrost || !z.firstFall) return null;
+    const interval = Math.max(1, sc.intervalDays || 14);
+    const year = today.getFullYear();
+    const anchorMd = sc.sowAnchor === "firstFall" ? z.firstFall : z.lastFrost;
+    const anchor = new Date(year, anchorMd[0] - 1, anchorMd[1]);
+    const firstSow = new Date(anchor.getTime() + (sc.sowStartWk || 0) * 7 * MS_PER_DAY);
+    firstSow.setHours(0, 0, 0, 0);
+    const fall = new Date(year, z.firstFall[0] - 1, z.firstFall[1]);
+    const maturity = dtm || sc.daysToMaturity || 60;
+    const tol = sc.frostTolDays || 0;
+    const lastSow = new Date(fall.getTime() - (maturity - tol) * MS_PER_DAY);
+    lastSow.setHours(0, 0, 0, 0);
+    if (lastSow < firstSow) return null;
+    const span = Math.round((lastSow.getTime() - firstSow.getTime()) / MS_PER_DAY);
+    const count = Math.floor(span / interval) + 1;
+    const t0 = new Date(today); t0.setHours(0, 0, 0, 0);
+    let next = null, remaining = 0;
+    for (let i = 0; i < count; i++) {
+      const d = new Date(firstSow.getTime() + i * interval * MS_PER_DAY);
+      d.setHours(0, 0, 0, 0);
+      if (d.getTime() >= t0.getTime()) { if (!next) next = d; remaining++; }
+    }
+    let state = "active";
+    if (t0.getTime() < firstSow.getTime()) state = "upcoming";
+    else if (t0.getTime() > lastSow.getTime()) state = "past";
+    return { interval, firstSow, lastSow, count, next, remaining, state, year };
+  }
+
+
   const HEAT_ADVICE = {
     cool: "Cool-season crop — heat brings on bolting, bitterness, and poor quality. Give afternoon shade, water deeply in the morning, and harvest promptly.",
     fruit: "Extreme heat can drop blossoms and pause fruit set. Keep soil evenly moist, mulch, and shade in the hottest afternoons — fruiting resumes as it cools.",
@@ -997,6 +1032,33 @@
       if (act) seedBadge = `<span class="badge ${act.cls}">${act.label}</span>`;
     }
 
+    let successionBlock = "";
+    if (hasZone && !frostFree && p.succession) {
+      const sp = successionPlanFor(p.succession, currentZone, p.daysToMaturity, new Date());
+      if (sp) {
+        const thisYear = new Date().getFullYear();
+        const wy = sp.year !== thisYear;
+        const everyLabel = sp.interval % 7 === 0
+          ? `${sp.interval / 7} week${sp.interval / 7 === 1 ? "" : "s"}`
+          : `${sp.interval} days`;
+        let nextLine;
+        if (sp.state === "active" && sp.next) {
+          nextLine = `<p><strong>Next sowing:</strong> around ${fmtSeedDate(sp.next, wy)} <span class="muted">(${sp.remaining} sowing${sp.remaining === 1 ? "" : "s"} left this season)</span></p>`;
+        } else if (sp.state === "upcoming") {
+          nextLine = `<p class="muted">First sowing starts around ${fmtSeedDate(sp.firstSow, wy)}.</p>`;
+        } else {
+          nextLine = `<p class="muted">The sowing window for this season has passed — resume next spring.</p>`;
+        }
+        successionBlock = `
+        <div class="succession-guide">
+          <h4>🔁 Succession sowing <span class="muted">(Zone ${escapeHtml(currentZone.toUpperCase())})</span></h4>
+          <p><strong>Sow every ${everyLabel}</strong> from ${fmtSeedDate(sp.firstSow, false)} to ${fmtSeedDate(sp.lastSow, wy)} — about ${sp.count} sowing${sp.count === 1 ? "" : "s"} for a steady harvest instead of one big glut.</p>
+          ${nextLine}
+          ${p.succession.note ? `<p>${escapeHtml(p.succession.note)}</p>` : ""}
+        </div>`;
+      }
+    }
+
     const actions = p.custom
       ? `<button class="water-btn" data-act="add">+ Add to my garden</button>
          <button data-act="edit-custom">Edit</button>
@@ -1013,6 +1075,7 @@
         ${latinLine}
         ${timing}
         ${seedBlock}
+        ${successionBlock}
         ${facts.length ? `<p class="meta">${facts.join("")}</p>` : ""}
         ${p.tips ? `<p class="notes">${escapeHtml(p.tips)}</p>` : ""}
         ${harvestBlock}
@@ -2158,7 +2221,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, setWeather: (w) => { weather = w; } };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, setWeather: (w) => { weather = w; } };
   }
 
   render();
