@@ -17,6 +17,11 @@
   const RAIN_WX_KEY = "garden.weather.v1";
   const RAIN_THRESHOLD_IN = 0.25;   // rainfall (inches) that counts as a watering
   const RAIN_WINDOW_DAYS = 8;        // how far back rain can "reset" the schedule
+  // --- Heat / humidity warnings (uses the same location + fetch) ---
+  const HEAT_WARN_F_DEFAULT = 90;   // fallback daytime-high threshold for plants w/o data
+  const HUMID_WARN_PCT = 80;        // relative humidity considered "muggy"
+  const HUMID_MIN_TEMP_F = 68;      // muggy only raises disease risk when it's also warm
+  const CLIMATE_FORECAST_DAYS = 4;  // look this many days ahead for heat/humidity warnings
   let rainEnabled = localStorage.getItem(RAIN_ENABLED_KEY) === "1";
   let rainLoc = loadJson(RAIN_LOC_KEY, null);      // { lat, lon, label }
   let weather = loadJson(RAIN_WX_KEY, null);        // { fetchedAt, byDate:{date:inches} }
@@ -247,9 +252,112 @@
     return res;
   }
 
+  // --- Heat / humidity climate warnings -------------------------------------
+  const HEAT_ADVICE = {
+    cool: "Cool-season crop — heat brings on bolting, bitterness, and poor quality. Give afternoon shade, water deeply in the morning, and harvest promptly.",
+    fruit: "Extreme heat can drop blossoms and pause fruit set. Keep soil evenly moist, mulch, and shade in the hottest afternoons — fruiting resumes as it cools.",
+    tough: "Heat-tolerant but thirsty — water deeply early in the day, mulch to hold moisture, and watch for midday wilting.",
+    generic: "Water deeply in the early morning, mulch to conserve moisture, and provide afternoon shade on the hottest days.",
+  };
+  const HUMID_ADVICE = "Muggy, still air invites fungal disease (mildew, blight, rust). Water at the base rather than the leaves, improve airflow and spacing, avoid handling plants while wet, and remove any affected foliage.";
+
+  // Climate profile for a tracked plant, via its guide plant or sensible defaults.
+  function climateOf(p) {
+    const gp = guidePlantFor(p);
+    const c = (p && p.climate) || (gp && gp.climate) || null;
+    return {
+      heatF: c && c.heatF != null ? c.heatF : HEAT_WARN_F_DEFAULT,
+      cat: (c && c.cat) || "generic",
+      humid: !!(c && c.humid),
+      known: !!c,
+    };
+  }
+
+  // Peak heat / muggiest day across today..+N from the stored forecast.
+  function forecastPeak() {
+    if (!weather || !weather.heatByDate) return null;
+    const today = todayStr();
+    const end = localDateStr(new Date(Date.now() + CLIMATE_FORECAST_DAYS * MS_PER_DAY));
+    let peakF = -Infinity, peakFeels = -Infinity, hotDay = null;
+    let humidDay = null, humidRh = -Infinity, humidTemp = null;
+    for (const [date, h] of Object.entries(weather.heatByDate)) {
+      if (!h || date < today || date > end) continue;
+      if (h.tmax != null && h.tmax > peakF) { peakF = h.tmax; hotDay = date; }
+      if (h.feels != null && h.feels > peakFeels) peakFeels = h.feels;
+      // Muggy = high humidity while also warm.
+      if (h.rh != null && h.tmax != null && h.tmax >= HUMID_MIN_TEMP_F && h.rh >= HUMID_WARN_PCT && h.rh > humidRh) {
+        humidRh = h.rh; humidDay = date; humidTemp = h.tmax;
+      }
+    }
+    if (peakF === -Infinity) return null;
+    return { peakF, peakFeels, hotDay, humidDay, humidRh: humidRh === -Infinity ? null : humidRh, humidTemp };
+  }
+
+  // Whether a specific plant is at heat / humidity risk over the forecast window.
+  function climateAlertFor(p) {
+    const fp = forecastPeak();
+    if (!fp) return null;
+    const c = climateOf(p);
+    const heat = fp.peakF >= c.heatF;
+    const humid = c.humid && fp.humidDay != null;
+    if (!heat && !humid) return null;
+    return { heat, humid, peakF: fp.peakF, peakFeels: fp.peakFeels, hotDay: fp.hotDay,
+             humidDay: fp.humidDay, humidRh: fp.humidRh, cat: c.cat, heatF: c.heatF };
+  }
+
+  function dayLabel(dateStr) {
+    if (!dateStr) return "";
+    const t = todayStr();
+    const tmr = localDateStr(new Date(Date.now() + MS_PER_DAY));
+    if (dateStr === t) return "today";
+    if (dateStr === tmr) return "tomorrow";
+    const d = parseLocalDate(dateStr);
+    return d ? d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : dateStr;
+  }
+
+  // Top-of-page banner summarizing which plants face heat / humidity stress.
+  function renderClimateAlert() {
+    const el = document.getElementById("climateAlert");
+    if (!el) return;
+    const fp = (rainEnabled && weather) ? forecastPeak() : null;
+    if (!fp || !plants.length) { el.hidden = true; el.innerHTML = ""; return; }
+
+    const heatPlants = [], humidPlants = [];
+    for (const p of plants) {
+      const a = climateAlertFor(p);
+      if (!a) continue;
+      if (a.heat) heatPlants.push(p);
+      if (a.humid) humidPlants.push(p);
+    }
+    if (!heatPlants.length && !humidPlants.length) { el.hidden = true; el.innerHTML = ""; return; }
+
+    const names = (arr) => arr.map((p) => escapeHtml(trackedDisplayName(p))).join(", ");
+    const blocks = [];
+    if (heatPlants.length) {
+      const feels = fp.peakFeels != null && fp.peakFeels >= fp.peakF + 3 ? ` (feels ${Math.round(fp.peakFeels)}°)` : "";
+      blocks.push(`
+        <div class="climate-block heat">
+          <strong>🔥 Heat advisory — up to ${Math.round(fp.peakF)}°F${feels} ${escapeHtml(dayLabel(fp.hotDay))}</strong>
+          <p>${heatPlants.length} plant${heatPlants.length > 1 ? "s" : ""} may be stressed: <span class="climate-names">${names(heatPlants)}</span></p>
+          <p class="muted">Water deeply in the early morning, mulch to hold moisture, and shade the most sensitive crops through the hottest afternoons.</p>
+        </div>`);
+    }
+    if (humidPlants.length) {
+      blocks.push(`
+        <div class="climate-block humid">
+          <strong>🍄 Humid — disease watch (~${Math.round(fp.humidRh)}% humidity ${escapeHtml(dayLabel(fp.humidDay))})</strong>
+          <p>${humidPlants.length} plant${humidPlants.length > 1 ? "s" : ""} prone to fungal disease: <span class="climate-names">${names(humidPlants)}</span></p>
+          <p class="muted">Water at the base (not the leaves), improve airflow and spacing, and avoid handling plants while wet.</p>
+        </div>`);
+    }
+    el.innerHTML = blocks.join("");
+    el.hidden = false;
+  }
+
   // --- Rendering ---
   function render() {
     renderWeatherPanel();
+    renderClimateAlert();
     const filter = filterEl.value;
     const sortMode = sortEl ? sortEl.value : "thirsty";
     const sorted = [...plants].sort((a, b) => {
@@ -333,6 +441,23 @@
       }
     }
 
+    const clim = climateAlertFor(p);
+    let climateBadge = "", climateNote = "";
+    if (clim) {
+      if (clim.heat) climateBadge += `<span class="badge heat-risk">🔥 Heat risk</span>`;
+      if (clim.humid) climateBadge += `<span class="badge humid-risk">🍄 Disease risk</span>`;
+      const parts = [];
+      if (clim.heat) {
+        const feels = clim.peakFeels != null && clim.peakFeels >= clim.peakF + 3
+          ? ` (feels ${Math.round(clim.peakFeels)}°)` : "";
+        parts.push(`🔥 Up to ${Math.round(clim.peakF)}°F${feels} ${dayLabel(clim.hotDay)}, above this crop's ~${clim.heatF}°F comfort. ${HEAT_ADVICE[clim.cat] || HEAT_ADVICE.generic}`);
+      }
+      if (clim.humid) {
+        parts.push(`🍄 Muggy (~${Math.round(clim.humidRh)}% humidity ${dayLabel(clim.humidDay)}). ${HUMID_ADVICE}`);
+      }
+      climateNote = `<p class="climate-note">${parts.map(escapeHtml).join("<br>")}</p>`;
+    }
+
     return `
       <article class="card ${st.cls}${harvestClass}" data-id="${p.id}">
         <div class="card-top">
@@ -340,11 +465,13 @@
           <div class="badge-stack">
             <span class="badge ${st.badge}">${st.label}</span>
             ${harvestBadge}
+            ${climateBadge}
           </div>
         </div>
         ${meta.length ? `<p class="meta">${meta.join("")}</p>` : ""}
         ${rainNote}
         ${harvestNote}
+        ${climateNote}
         ${p.notes ? `<p class="notes">${escapeHtml(p.notes)}</p>` : ""}
         <div class="card-actions">
           <button class="water-btn" data-act="water">💧 Water now</button>
@@ -1022,15 +1149,23 @@
     wxBusy = true; wxError = ""; renderWeatherPanel();
     try {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${rainLoc.lat}` +
-        `&longitude=${rainLoc.lon}&daily=precipitation_sum&past_days=7&forecast_days=2` +
-        `&precipitation_unit=inch&timezone=auto`;
+        `&longitude=${rainLoc.lon}&daily=precipitation_sum,temperature_2m_max,apparent_temperature_max,relative_humidity_2m_max` +
+        `&past_days=7&forecast_days=${Math.max(2, CLIMATE_FORECAST_DAYS + 1)}` +
+        `&precipitation_unit=inch&temperature_unit=fahrenheit&timezone=auto`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Weather service error " + res.status);
       const data = await res.json();
-      const byDate = {};
-      const t = data.daily.time, v = data.daily.precipitation_sum;
-      for (let i = 0; i < t.length; i++) byDate[t[i]] = v[i] == null ? 0 : v[i];
-      weather = { fetchedAt: Date.now(), byDate };
+      const byDate = {}, heatByDate = {};
+      const d = data.daily, t = d.time, v = d.precipitation_sum;
+      for (let i = 0; i < t.length; i++) {
+        byDate[t[i]] = v[i] == null ? 0 : v[i];
+        heatByDate[t[i]] = {
+          tmax: d.temperature_2m_max ? d.temperature_2m_max[i] : null,
+          feels: d.apparent_temperature_max ? d.apparent_temperature_max[i] : null,
+          rh: d.relative_humidity_2m_max ? d.relative_humidity_2m_max[i] : null,
+        };
+      }
+      weather = { fetchedAt: Date.now(), byDate, heatByDate };
       persistRain();
     } catch (e) {
       wxError = e.message || "Couldn't fetch weather.";
@@ -1104,8 +1239,8 @@
       html = `
         <div class="wx-off">
           <div>
-            <strong>🌧️ Rain-aware watering</strong>
-            <p class="muted">Optional. Uses recent rainfall near you (via Open-Meteo) so plants aren't marked thirsty right after it rains. Sends only your approximate location — off by default.</p>
+            <strong>🌦️ Weather-aware garden</strong>
+            <p class="muted">Optional. Uses nearby weather (via Open-Meteo) so plants aren't marked thirsty right after rain, and warns you when heat or humidity may stress your crops. Sends only your approximate location — off by default.</p>
           </div>
           <button class="primary" data-wx="enable">Turn on</button>
         </div>`;
@@ -1114,8 +1249,8 @@
     } else if (!rainLoc) {
       html = `
         <div class="wx-on">
-          <div class="wx-line"><strong>🌧️ Rain-aware watering is on</strong>
-          <p class="muted">Set your location to check rainfall:</p></div>
+          <div class="wx-line"><strong>🌦️ Weather-aware garden is on</strong>
+          <p class="muted">Set your location to check rain, heat &amp; humidity:</p></div>
           <div class="wx-actions">
             <button class="primary" data-wx="gps">📍 Use my location</button>
             <button data-wx="city">Enter town/city</button>
@@ -1137,6 +1272,7 @@
             ${sig ? `Last significant rain: ${fmtDate(sig.date)} (${sig.inches.toFixed(2)}″), counted as a watering.` : `No significant rain (≥${RAIN_THRESHOLD_IN}″) recently.`}
             ${tmr != null ? ` · Tomorrow: ${tmr.toFixed(2)}″ forecast.` : ""}
           </p>
+          ${(() => { const fp = forecastPeak(); return fp ? `<p class="muted wx-detail">🌡️ Next ${CLIMATE_FORECAST_DAYS} days peak ~${Math.round(fp.peakF)}°F${fp.humidDay ? `, up to ${Math.round(fp.humidRh)}% humidity` : ""}. Heat &amp; humidity warnings show on your plants.</p>` : ""; })()}
           <div class="wx-actions">
             <button data-wx="refresh">↻ Refresh</button>
             <button data-wx="gps">📍 Update location</button>
@@ -1161,9 +1297,10 @@
     else if (act === "refresh") fetchWeather();
   });
 
-  // Refresh weather in the background on load if enabled and stale (>3h).
+  // Refresh weather in the background on load if enabled and stale (>3h),
+  // or if cached data predates the heat/humidity fields.
   if (rainEnabled && rainLoc) {
-    const stale = !weather || (Date.now() - (weather.fetchedAt || 0)) > 3 * 3600 * 1000;
+    const stale = !weather || !weather.heatByDate || (Date.now() - (weather.fetchedAt || 0)) > 3 * 3600 * 1000;
     if (stale && navigator.onLine) fetchWeather();
   }
 
@@ -2014,7 +2151,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, setWeather: (w) => { weather = w; } };
   }
 
   render();

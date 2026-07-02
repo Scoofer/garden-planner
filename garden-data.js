@@ -75,6 +75,7 @@ window.GARDEN_DATA = (function () {
       crop: "Watermelon", latin: "Citrullus lanatus",
       sun: "Full sun", spacingIn: 6, rowIn: 48, depthIn: 0.75,
       daysToMaturity: 85, germDays: "5–10", perennial: false,
+      climate: { heatF: 95, cat: "tough", humid: true },
       methods: [
         { type: "Start indoors", anchor: "lastFrost", startWk: -4, endWk: -3 },
         { type: "Direct sow / transplant", anchor: "lastFrost", startWk: 0, endWk: 3 },
@@ -93,6 +94,7 @@ window.GARDEN_DATA = (function () {
       crop: "Muskmelon", latin: "Cucumis melo",
       sun: "Full sun", spacingIn: 24, rowIn: 72, depthIn: 0.5,
       daysToMaturity: 80, germDays: "4–10", perennial: false,
+      climate: { heatF: 95, cat: "tough", humid: true },
       methods: [
         { type: "Start indoors", anchor: "lastFrost", startWk: -4, endWk: -3 },
         { type: "Direct sow / transplant", anchor: "lastFrost", startWk: 0, endWk: 3 },
@@ -111,6 +113,7 @@ window.GARDEN_DATA = (function () {
       crop: "Watermelon", latin: "Citrullus lanatus",
       sun: "Full sun", spacingIn: 36, rowIn: 72, depthIn: 0.75,
       daysToMaturity: 90, germDays: "7–10", perennial: false,
+      climate: { heatF: 95, cat: "tough", humid: true },
       methods: [
         { type: "Start indoors", anchor: "lastFrost", startWk: -4, endWk: -3 },
         { type: "Direct sow / transplant", anchor: "lastFrost", startWk: 0, endWk: 3 },
@@ -129,6 +132,7 @@ window.GARDEN_DATA = (function () {
       crop: "Summer squash", latin: "Cucurbita pepo",
       sun: "Full sun", spacingIn: 6, rowIn: 36, depthIn: 0.5,
       daysToMaturity: 58, germDays: "10–15", perennial: false,
+      climate: { heatF: 95, cat: "tough", humid: true },
       methods: [
         { type: "Direct sow", anchor: "lastFrost", startWk: 0, endWk: 4 },
       ],
@@ -146,6 +150,7 @@ window.GARDEN_DATA = (function () {
       crop: "Cucumber", latin: "Cucumis sativus",
       sun: "Full sun", spacingIn: 12, rowIn: 36, depthIn: 0.5,
       daysToMaturity: 60, germDays: "7–14", perennial: false,
+      climate: { heatF: 92, cat: "tough", humid: true },
       methods: [
         { type: "Start indoors", anchor: "lastFrost", startWk: -3, endWk: -2 },
         { type: "Direct sow / transplant", anchor: "lastFrost", startWk: 0, endWk: 4 },
@@ -164,6 +169,7 @@ window.GARDEN_DATA = (function () {
       crop: "Pea", latin: "Pisum sativum",
       sun: "Full sun", spacingIn: 2, rowIn: 24, depthIn: 1,
       daysToMaturity: 60, germDays: "4–8", perennial: false,
+      climate: { heatF: 80, cat: "cool", humid: true },
       methods: [
         { type: "Direct sow (spring)", anchor: "lastFrost", startWk: -6, endWk: 0 },
         { type: "Direct sow (fall)", anchor: "firstFall", startWk: -9, endWk: -7 },
@@ -182,6 +188,7 @@ window.GARDEN_DATA = (function () {
       crop: "Carrot", latin: "Daucus carota",
       sun: "Full sun", spacingIn: 2.5, rowIn: 12, depthIn: 0.25,
       daysToMaturity: 75, germDays: "14–28", perennial: false,
+      climate: { heatF: 85, cat: "cool", humid: false },
       methods: [
         { type: "Direct sow (spring)", anchor: "lastFrost", startWk: -4, endWk: 2 },
         { type: "Direct sow (fall)", anchor: "firstFall", startWk: -11, endWk: -8 },
@@ -200,6 +207,7 @@ window.GARDEN_DATA = (function () {
       crop: "Bush bean", latin: "Phaseolus vulgaris",
       sun: "Full sun", spacingIn: 4, rowIn: 30, depthIn: 1.25,
       daysToMaturity: 58, germDays: "7–10", perennial: false,
+      climate: { heatF: 90, cat: "fruit", humid: true },
       methods: [
         { type: "Direct sow", anchor: "lastFrost", startWk: 0, endWk: 6 },
       ],
@@ -217,6 +225,7 @@ window.GARDEN_DATA = (function () {
       crop: "Asparagus", latin: "Asparagus officinalis",
       sun: "Full sun", spacingIn: 18, rowIn: 48, depthIn: 6,
       daysToMaturity: null, germDays: "14–21", perennial: true,
+      climate: { heatF: 95, cat: "tough", humid: false },
       harvestSeason: { anchor: "lastFrost", startWk: -1, endWk: 6, establishYears: 2 },
       methods: [
         { type: "Plant crowns / transplant", anchor: "lastFrost", startWk: -2, endWk: 4 },
@@ -235,6 +244,7 @@ window.GARDEN_DATA = (function () {
       crop: "Pole bean", latin: "Phaseolus vulgaris",
       sun: "Full sun", spacingIn: 4, rowIn: 36, depthIn: 1,
       daysToMaturity: 65, germDays: "7–10", perennial: false,
+      climate: { heatF: 90, cat: "fruit", humid: true },
       methods: [
         { type: "Direct sow", anchor: "lastFrost", startWk: 0, endWk: 4 },
       ],
@@ -252,6 +262,7 @@ window.GARDEN_DATA = (function () {
       crop: "Tomato (indeterminate)", latin: "Solanum lycopersicum",
       sun: "Full sun", spacingIn: 24, rowIn: 36, depthIn: 0.25,
       daysToMaturity: 92, germDays: "7–14", perennial: false,
+      climate: { heatF: 92, cat: "fruit", humid: true },
       methods: [
         { type: "Start indoors", anchor: "lastFrost", startWk: -6, endWk: -6 },
         { type: "Transplant out", anchor: "lastFrost", startWk: 1, endWk: 3 },
@@ -270,6 +281,7 @@ window.GARDEN_DATA = (function () {
       crop: "Tomato (indeterminate)", latin: "Solanum lycopersicum",
       sun: "Full sun", spacingIn: 24, rowIn: 36, depthIn: 0.25,
       daysToMaturity: 80, germDays: "6–10", perennial: false,
+      climate: { heatF: 92, cat: "fruit", humid: true },
       methods: [
         { type: "Start indoors", anchor: "lastFrost", startWk: -6, endWk: -6 },
         { type: "Transplant out", anchor: "lastFrost", startWk: 1, endWk: 3 },
@@ -288,6 +300,7 @@ window.GARDEN_DATA = (function () {
       crop: "Tomato (indeterminate)", latin: "Solanum lycopersicum",
       sun: "Full sun", spacingIn: 24, rowIn: 36, depthIn: 0.25,
       daysToMaturity: 70, germDays: "6–14", perennial: false,
+      climate: { heatF: 92, cat: "fruit", humid: true },
       methods: [
         { type: "Start indoors", anchor: "lastFrost", startWk: -6, endWk: -6 },
         { type: "Transplant out", anchor: "lastFrost", startWk: 1, endWk: 3 },
@@ -306,6 +319,7 @@ window.GARDEN_DATA = (function () {
       crop: "Garlic", latin: "Allium sativum",
       sun: "Full sun", spacingIn: 5, rowIn: 12, depthIn: 2,
       daysToMaturity: 240, perennial: false,
+      climate: { heatF: 90, cat: "tough", humid: false },
       methods: [
         { type: "Plant cloves (fall)", anchor: "firstFall", startWk: -2, endWk: 4 },
       ],

@@ -134,6 +134,17 @@ select, input, textarea {
 .wx-attrib a { color: var(--green-dark); }
 .wx-error { margin: 0.5rem 0 0; color: var(--thirsty); font-size: 0.85rem; }
 .rain-note { margin: 0.5rem 0 0; font-size: 0.83rem; color: #1565c0; background: #e7f0fb; padding: 0.35rem 0.55rem; border-radius: 8px; }
+.climate-note { margin: 0.5rem 0 0; font-size: 0.83rem; color: #7a3313; background: #fdeee7; padding: 0.4rem 0.55rem; border-radius: 8px; line-height: 1.35; }
+
+/* Heat / humidity advisory banner (My Garden) */
+.climate-alert { display: grid; gap: 0.6rem; margin-bottom: 0.4rem; }
+.climate-block { padding: 0.7rem 0.85rem; border-radius: 12px; border-left: 4px solid; }
+.climate-block strong { display: block; font-size: 0.98rem; }
+.climate-block p { margin: 0.3rem 0 0; font-size: 0.86rem; }
+.climate-block.heat { background: #fdece4; border-color: #e0673a; color: #7a3313; }
+.climate-block.humid { background: #e5f1f2; border-color: #3a97a0; color: #1f5a61; }
+.climate-block .muted { color: inherit; opacity: 0.8; }
+.climate-names { font-weight: 600; }
 
 .plant-list { display: grid; gap: 0.85rem; }
 
@@ -172,6 +183,8 @@ select, input, textarea {
 .badge.seed-soon { background: #eef5e4; color: #5a7a3a; }
 .badge.seed-harden { background: #e0f0f4; color: #1f6b7a; }
 .badge.seed-transplant { background: #d8ead8; color: #2e6b3e; }
+.badge.heat-risk { background: #ffe0d6; color: #b23b12; }
+.badge.humid-risk { background: #e0eef0; color: #256b73; }
 .field-hint { display: block; font-weight: 400; font-size: 0.78rem; color: var(--muted); margin-top: 0.2rem; }
 .guide-card.custom-card { border-left: 3px solid #8f8fd6; }
 
