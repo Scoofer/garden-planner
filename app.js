@@ -64,6 +64,7 @@
     sun: document.getElementById("sun"),
     notes: document.getElementById("notes"),
     placeBed: document.getElementById("placeBed"),
+    mulched: document.getElementById("mulched"),
   };
   const placeBedRow = document.getElementById("placeBedRow");
   const locationRow = document.getElementById("locationRow");
@@ -115,11 +116,20 @@
     return { date, fromRain, rain };
   }
 
-  function daysUntilWater(p) {
+  // Straw mulch (1–2") slows evaporation, so mulched plants can go longer
+  // between waterings. Applied as a multiplier on the plant's set interval.
+  const MULCH_FACTOR = 1.5;
+  function effectiveInterval(p) {
     if (!p.interval) return null;
+    return p.mulched ? Math.round(p.interval * MULCH_FACTOR) : p.interval;
+  }
+
+  function daysUntilWater(p) {
+    const eff = effectiveInterval(p);
+    if (!eff) return null;
     const base = effectiveWaterBase(p);
     const last = parseLocalDate(base.date);
-    const due = new Date(last.getTime() + p.interval * MS_PER_DAY);
+    const due = new Date(last.getTime() + eff * MS_PER_DAY);
     const now = new Date();
     return Math.floor((due.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0)) / MS_PER_DAY);
   }
@@ -284,6 +294,7 @@
     if (p.planted) meta.push(`<span>🌱 Planted ${fmtDate(p.planted)}</span>`);
     if (p.lastWatered) meta.push(`<span>💧 Watered ${fmtDate(p.lastWatered)}</span>`);
     if (p.interval) meta.push(`<span>🔁 Every ${p.interval}d</span>`);
+    if (p.mulched) meta.push(`<span class="mulch-chip">🌾 Mulched → ~${effectiveInterval(p)}d</span>`);
 
     const rainNote = (base.fromRain && p.interval)
       ? `<p class="rain-note">🌧️ Counting ${base.rain.inches.toFixed(2)}″ rain on ${fmtDate(base.rain.date)} as a watering.</p>`
@@ -355,6 +366,7 @@
       f.interval.value = plant.interval || "";
       f.sun.value = plant.sun || "";
       f.notes.value = plant.notes || "";
+      if (f.mulched) f.mulched.checked = !!plant.mulched;
       dialogMeta = { guideId: plant.guideId || null, spacingIn: plant.spacingIn || null };
       const cur = plantingBed(plant);
       // In a bed -> its bed; has a free-text location -> "Not in a bed"; else neutral.
@@ -383,6 +395,7 @@
       interval: parseInt(f.interval.value, 10) || null,
       sun: f.sun.value,
       notes: f.notes.value.trim(),
+      mulched: !!(f.mulched && f.mulched.checked),
       lastWatered: existing ? existing.lastWatered : "",
       guideId: dialogMeta ? dialogMeta.guideId : (existing ? existing.guideId : null),
       spacingIn: dialogMeta ? dialogMeta.spacingIn : (existing ? existing.spacingIn : null),
@@ -2001,7 +2014,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater };
   }
 
   render();

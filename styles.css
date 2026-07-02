@@ -177,6 +177,7 @@ select, input, textarea {
 
 .meta { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; }
 .meta span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.meta span.mulch-chip { color: #7a5a00; background: #f7f0dd; padding: 0.05rem 0.4rem; border-radius: 6px; font-weight: 600; }
 .notes { margin: 0.6rem 0 0; font-size: 0.88rem; white-space: pre-wrap; }
 
 .card-actions { display: flex; gap: 0.5rem; margin-top: 0.85rem; flex-wrap: wrap; }
