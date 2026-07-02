@@ -67,6 +67,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "sugar-baby-watermelon",
       name: "Sugar Baby Watermelon",
+      fertilize: { feeder: "Heavy", tips: "Work compost into the bed before planting. Feed a balanced fertilizer at planting, then switch to a lower-nitrogen, higher-potassium feed once vines flower — too much nitrogen means leafy vines and few melons. Ease off as fruit ripens." },
       harvest: {
         cues: "Ripe when the curly tendril nearest the fruit dries brown, the pale ground spot turns creamy yellow, and a thump sounds deep and hollow.",
         how: "Cut the stem with pruners about an inch from the fruit — watermelons don't ripen further once picked.",
@@ -86,6 +87,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "honey-rock-melon",
       name: "Honey Rock Melon",
+      fertilize: { feeder: "Heavy", tips: "Rich, compost-amended soil. Balanced feed at planting; shift to a low-nitrogen, higher-potassium feed at flowering and fruit set for sweeter melons. Avoid excess nitrogen." },
       harvest: {
         cues: "Ready at 'full slip' — the skin netting turns tan, the blossom end smells sweet, and a ripe fruit pulls from the stem with only light pressure.",
         how: "Cradle the melon and gently push where it meets the stem; if ripe it slips off cleanly. Harvest in the morning.",
@@ -105,6 +107,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "stone-mountain-watermelon",
       name: "Stone Mountain Watermelon",
+      fertilize: { feeder: "Heavy", tips: "Compost-rich bed. Balanced feed at planting, then a lower-nitrogen, higher-potassium feed once vines run and flower. Too much nitrogen gives vines instead of fruit; ease off as melons ripen." },
       harvest: {
         cues: "Ripe when the tendril nearest the fruit dries, the ground spot turns buttery yellow, and it gives a deep, hollow thump.",
         how: "Cut from the vine with pruners, leaving a short stub; it won't sweeten further after picking.",
@@ -124,6 +127,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "black-beauty-zucchini",
       name: "Black Beauty Zucchini",
+      fertilize: { feeder: "Heavy", tips: "Dig in plenty of compost at planting. Feed a balanced fertilizer every 3–4 weeks through the season — pale leaves signal they want more. Steady feeding keeps fruit coming." },
       harvest: {
         cues: "Best picked young at 6–8\" long while the skin is glossy and a thumbnail dents it easily. Check plants daily in peak season — fruit grows fast.",
         how: "Cut the stem with a knife or pruners; frequent picking keeps the plant setting new fruit.",
@@ -142,6 +146,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "china-jade-cucumber",
       name: "China Jade Cucumber",
+      fertilize: { feeder: "Heavy", tips: "Compost-rich soil. Balanced feed at planting, then liquid-feed or side-dress every 3–4 weeks. Cut back nitrogen once flowering so plants set fruit instead of running to vine." },
       harvest: {
         cues: "Pick when firm, uniformly green, and 8–10\" long — before they yellow or bulge. Harvest every 1–2 days to keep vines productive.",
         how: "Snip the stem with pruners rather than tugging, to avoid damaging the vine.",
@@ -161,6 +166,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "early-frosty-pea",
       name: "Early Frosty Pea",
+      fertilize: { feeder: "Light", tips: "Peas fix their own nitrogen, so skip high-nitrogen feeds (they give leaves, not pods). A little compost or a low-N, higher-P/K feed is plenty; a legume inoculant at sowing helps on new ground." },
       harvest: {
         cues: "Harvest when pods are plump, bright green, and rounded with peas but before they turn waxy or dull. Pick from the bottom of the plant upward.",
         how: "Hold the vine with one hand and pull the pod with the other to avoid tearing the plant. Pick often — sugars turn to starch quickly.",
@@ -180,6 +186,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "rainbow-carrot-mix",
       name: "Annie's Rainbow Carrot Mix",
+      fertilize: { feeder: "Light", tips: "Avoid fresh manure and high nitrogen, which cause forked, hairy roots. Work a low-nitrogen fertilizer higher in phosphorus and potassium into the bed before sowing; usually no further feeding needed." },
       harvest: {
         cues: "Ready when the shoulders reach 3/4–1\" across and poke above the soil; flavor sweetens after a light fall frost. Pull as needed once big enough.",
         how: "Loosen the soil with a fork and lift by the crown; twist off the tops after harvest so they don't draw moisture from the roots.",
@@ -199,6 +206,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "royal-burgundy-bush-bean",
       name: "Royal Burgundy Bush Bean",
+      fertilize: { feeder: "Light", tips: "Beans fix their own nitrogen. Skip high-N feeds; compost or a balanced low-nitrogen fertilizer at planting is enough. Excess nitrogen means foliage over pods." },
       harvest: {
         cues: "Pick when pods are firm, pencil-thick, and snap crisply — before the seeds bulge visibly. The purple pods make them easy to spot.",
         how: "Hold the stem and pull the pod off with your other hand. Harvest every 2–3 days; bush beans set most of their crop over a few weeks.",
@@ -217,6 +225,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "asparagus-uc72",
       name: "Asparagus UC72",
+      fertilize: { feeder: "Heavy", tips: "Feed this perennial bed twice a year — in early spring as spears emerge, and again after the harvest window when ferns are growing. Top-dress with compost annually and keep the bed weed-free." },
       harvest: {
         cues: "Don't harvest the first 2 seasons — let the ferns build the crown. From year 3, cut spears when 6–9\" tall with tips still tight, over a 4–8 week spring window.",
         how: "Snap spears at ground level or cut just below the soil. Stop once most new spears come up pencil-thin, and let the rest fern out to feed the crown.",
@@ -236,6 +245,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "green-beans-pole",
       name: "Green Beans (pole)",
+      fertilize: { feeder: "Light", tips: "A legume that fixes its own nitrogen, so go easy on N feeds (they delay flowering). Compost or a balanced low-nitrogen feed at planting; these long-season climbers appreciate a light mid-season feed." },
       harvest: {
         cues: "Pick when pods are firm and pencil-thick but before the seeds swell and the pod gets lumpy or tough.",
         how: "Pull pods off gently with two hands to avoid snapping the vine. Pole beans crop over a long season — pick every 2–3 days to keep them going.",
@@ -254,6 +264,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "carbon-tomato",
       name: "Carbon Tomato",
+      fertilize: { feeder: "Heavy", tips: "Plant into compost-rich soil. Feed at transplant, then every 2–3 weeks once fruit sets, using a lower-nitrogen, higher-phosphorus/potassium tomato feed — too much nitrogen gives leafy plants and few tomatoes. Steady water + feeding helps prevent blossom-end rot." },
       harvest: {
         cues: "Ripe when the fruit colors up fully to its dusky purple-red and yields slightly to gentle pressure. Vine-ripening gives the best flavor.",
         how: "Gently twist or snip at the stem, keeping the green calyx attached. Pick every couple of days once ripening starts.",
@@ -273,6 +284,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "virginia-sweets-tomato",
       name: "Virginia Sweets Tomato",
+      fertilize: { feeder: "Heavy", tips: "Rich, compost-amended soil. Feed at transplant, then every 2–3 weeks after fruit sets with a lower-nitrogen, higher-potassium tomato feed. Consistent watering and feeding wards off blossom-end rot." },
       harvest: {
         cues: "Ripe when the golden fruit takes on its scarlet blush and yields slightly to a gentle squeeze.",
         how: "Twist or snip from the vine with the calyx attached; harvest regularly as fruit ripens.",
@@ -292,6 +304,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "cherry-tomato",
       name: "Cherry Tomato (Annie's Mix)",
+      fertilize: { feeder: "Heavy", tips: "Compost-rich soil. Feed at transplant and every 2–3 weeks once fruiting, with a lower-nitrogen, higher-potassium tomato feed. Don't overdo nitrogen or you'll get lush vines and fewer tomatoes." },
       harvest: {
         cues: "Pick when fully colored and firm-but-giving; taste one — cherries are sweetest dead ripe. They can split if left too long or after heavy rain.",
         how: "Pinch or snip individual fruit, or harvest a whole truss when most are ripe. Pick every 1–2 days at peak.",
@@ -311,6 +324,7 @@ window.GARDEN_DATA = (function () {
     {
       id: "garlic",
       name: "Garlic",
+      fertilize: { feeder: "Moderate", tips: "Mix compost and a balanced fertilizer into the bed at fall planting. Side-dress with nitrogen in early spring as growth resumes, then again a few weeks later; stop feeding once bulbing begins (around when scapes appear) so energy goes to the bulb." },
       harvest: {
         cues: "Harvest mid-summer when the lower 3–4 leaves have browned but 5–6 upper leaves are still green (each green leaf is a wrapper layer around the bulb).",
         how: "Loosen the soil with a fork and lift gently — don't pull by the stalk. On hardnecks, snap off the curling flower scapes a few weeks earlier to boost bulb size.",

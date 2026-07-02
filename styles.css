@@ -263,6 +263,13 @@ select, input, textarea {
 .seed-guide p { margin: 0.25rem 0; font-size: 0.85rem; line-height: 1.35; }
 .seed-guide strong { color: var(--text); }
 
+.fertilize-guide { margin-top: 0.6rem; padding: 0.6rem 0.75rem; background: #eef6ee; border: 1px solid #cfe4cf; border-radius: 10px; }
+.fertilize-guide h4 { margin: 0 0 0.35rem; font-size: 0.9rem; color: #2f6b3e; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.fertilize-guide p { margin: 0.25rem 0; font-size: 0.85rem; line-height: 1.35; }
+.badge.feeder-heavy { background: #e6f0d8; color: #3f6b1e; }
+.badge.feeder-moderate { background: #eef2dc; color: #6b6a1e; }
+.badge.feeder-light { background: #eef5f0; color: #4a7a6a; }
+
 /* Seed-starting — My Garden seasonal to-dos */
 .seed-tasks { margin: 0 0 1rem; padding: 0.75rem 0.9rem; background: #f2f8ec; border: 1px solid #d6e6c6; border-radius: 12px; }
 .seed-tasks-title { margin: 0 0 0.5rem; font-size: 0.95rem; color: #3f6b1e; }

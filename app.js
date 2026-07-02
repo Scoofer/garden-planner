@@ -970,6 +970,12 @@
           ${p.harvest.storage ? `<p><strong>Storing:</strong> ${escapeHtml(p.harvest.storage)}</p>` : ""}
         </div>` : "";
 
+    const fertilizeBlock = p.fertilize ? `
+        <div class="fertilize-guide">
+          <h4>🌿 Feeding${p.fertilize.feeder ? ` <span class="badge feeder-${p.fertilize.feeder.toLowerCase()}">${escapeHtml(p.fertilize.feeder)} feeder</span>` : ""}</h4>
+          ${p.fertilize.tips ? `<p>${escapeHtml(p.fertilize.tips)}</p>` : ""}
+        </div>` : "";
+
     let seedBlock = "";
     let seedBadge = "";
     if (hasZone && !frostFree && hasIndoorStart(p)) {
@@ -1010,6 +1016,7 @@
         ${facts.length ? `<p class="meta">${facts.join("")}</p>` : ""}
         ${p.tips ? `<p class="notes">${escapeHtml(p.tips)}</p>` : ""}
         ${harvestBlock}
+        ${fertilizeBlock}
         ${src ? `<p class="source">📖 Source: ${src}${p.sources[0].retrieved ? ` <span class="muted">(${p.sources[0].retrieved})</span>` : ""}</p>` : ""}
         <div class="card-actions">
           ${actions}
