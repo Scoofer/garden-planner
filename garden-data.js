@@ -343,6 +343,50 @@ window.GARDEN_DATA = (function () {
       tips: "Plant individual cloves in fall, pointy end up, ~2\" deep, and mulch heavily for winter. Roots establish before the ground freezes, then bulbs size up the following summer — harvest when the lower leaves brown (usually mid-summer). Hardneck types (e.g. 'Music', 'Chesnok Red') are the most cold-hardy and best for colder zones; softneck types (e.g. 'Inchelium Red') store longer. Snap off flower scapes on hardnecks to boost bulb size.",
       sources: [ANNIES],
     },
+    {
+      id: "waltham-29-broccoli",
+      name: "Waltham 29 Broccoli",
+      fertilize: { feeder: "Heavy", tips: "Broccoli is a heavy feeder — dig plenty of compost or aged manure into the bed before planting. Side-dress with a balanced or slightly nitrogen-rich feed about 3 weeks after transplanting, then again as heads begin to form. Steady moisture plus feeding gives large, tight heads." },
+      harvest: {
+        cues: "Cut the central head while the buds are still tight, firm, and deep blue-green — before any yellow flowers open. Heads mature fast in warm weather, so check daily as they size up (this variety makes tight 4–8\" heads).",
+        how: "Cut the main head with 5–6\" of stalk at a slant so water sheds off. Leave the plant in — it keeps pushing out smaller side shoots for weeks of extra picking.",
+        storage: "Refrigerate unwashed in a loose bag for up to ~1 week; blanch and freeze for longer storage.",
+      },
+      crop: "Broccoli", latin: "Brassica oleracea",
+      sun: "Full sun", spacingIn: 18, rowIn: 24, depthIn: 0.5,
+      daysToMaturity: 80, germDays: "5–10", perennial: false,
+      climate: { heatF: 80, cat: "cool", humid: false },
+      methods: [
+        { type: "Start indoors", anchor: "lastFrost", startWk: -6, endWk: -5 },
+        { type: "Transplant out", anchor: "lastFrost", startWk: -2, endWk: 1 },
+        { type: "Start indoors (fall)", anchor: "firstFall", startWk: -16, endWk: -14 },
+        { type: "Transplant out (fall)", anchor: "firstFall", startWk: -12, endWk: -10 },
+      ],
+      tips: "Cold-hardy 1950s heirloom from the Univ. of Massachusetts. Compact 20–24\" plants form tight blue-green heads, then generous side shoots. Especially good for fall — flavor sweetens after a light frost. Keep well-watered and mulched so plants don't bolt in heat.",
+      sources: [ANNIES],
+    },
+    {
+      id: "de-cicco-broccoli",
+      name: "De Cicco Broccoli",
+      fertilize: { feeder: "Heavy", tips: "A hungry brassica — work compost or aged manure into the bed, then side-dress with a balanced or nitrogen-rich feed ~3 weeks after transplanting and again as heads form. Consistent water and feeding keep the side shoots coming." },
+      harvest: {
+        cues: "Cut the central head while buds are tight and green — it's a smaller 3–4\" main head, so don't wait for it to get large. After that, keep cutting the many side shoots before they flower.",
+        how: "Cut the main head with a few inches of stalk, then harvest side shoots every few days — this variety is prized for prolific cut-and-come-again picking over a long window.",
+        storage: "Refrigerate unwashed in a loose bag for up to ~1 week; blanch and freeze to keep longer.",
+      },
+      crop: "Broccoli", latin: "Brassica oleracea",
+      sun: "Full sun", spacingIn: 18, rowIn: 24, depthIn: 0.5,
+      daysToMaturity: 60, germDays: "5–10", perennial: false,
+      climate: { heatF: 80, cat: "cool", humid: false },
+      methods: [
+        { type: "Start indoors", anchor: "lastFrost", startWk: -6, endWk: -5 },
+        { type: "Transplant out", anchor: "lastFrost", startWk: -2, endWk: 1 },
+        { type: "Start indoors (fall)", anchor: "firstFall", startWk: -14, endWk: -12 },
+        { type: "Transplant out (fall)", anchor: "firstFall", startWk: -10, endWk: -8 },
+      ],
+      tips: "Early, productive Italian heirloom (1890). Smaller main head but throws side shoots prolifically over a long period — its uneven, extended maturity makes it ideal for the home garden. Great for both spring and fall; mulch and water steadily to delay bolting.",
+      sources: [ANNIES],
+    },
   ];
 
   // Companion planting: relationships between crop "groups" (not individual
@@ -360,6 +404,7 @@ window.GARDEN_DATA = (function () {
       squash: ["squash", "zucchini", "pumpkin", "gourd"],
       melon: ["melon", "watermelon", "muskmelon", "cantaloupe"],
       asparagus: ["asparagus"],
+      brassica: ["broccoli", "cabbage", "cauliflower", "kale", "brussels", "collard", "brassica"],
     },
     good: [
       ["tomato", "allium"], ["tomato", "carrot"], ["tomato", "asparagus"],
@@ -367,9 +412,11 @@ window.GARDEN_DATA = (function () {
       ["bean", "carrot"], ["bean", "cucumber"], ["bean", "squash"],
       ["bean", "melon"], ["bean", "pea"], ["pea", "carrot"], ["pea", "cucumber"],
       ["carrot", "cucumber"], ["squash", "melon"],
+      ["brassica", "allium"], ["brassica", "bean"], ["brassica", "pea"], ["brassica", "carrot"],
     ],
     bad: [
       ["allium", "bean"], ["allium", "pea"],
+      ["brassica", "tomato"],
     ],
     reasons: {
       "allium|bean": "Onions & garlic can stunt beans",
@@ -388,6 +435,11 @@ window.GARDEN_DATA = (function () {
       "pea|cucumber": "Mutually beneficial",
       "carrot|cucumber": "Grow well together",
       "squash|melon": "Similar needs — compatible",
+      "brassica|allium": "Alliums deter cabbage worms & aphids",
+      "brassica|bean": "Beans fix nitrogen for heavy-feeding brassicas",
+      "brassica|pea": "Peas fix nitrogen brassicas use",
+      "brassica|carrot": "Grow well together",
+      "brassica|tomato": "Both heavy feeders — compete for nutrients",
     },
   };
 
