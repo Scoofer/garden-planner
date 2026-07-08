@@ -160,6 +160,17 @@
     ));
   }
 
+  // Only allow http(s) links to be rendered as clickable anchors. Anything else
+  // (javascript:, data:, malformed, or non-string) is rejected so imported data
+  // can't smuggle a scripted URL into an href. Returns a safe absolute URL or null.
+  function safeUrl(u) {
+    if (typeof u !== "string" || !u) return null;
+    try {
+      const parsed = new URL(u, location.href);
+      return (parsed.protocol === "http:" || parsed.protocol === "https:") ? parsed.href : null;
+    } catch (e) { return null; }
+  }
+
   // Format a plant name as "Crop, Variety" so varieties group under their crop
   // (e.g. name "Sugar Baby Watermelon" + crop "Watermelon" -> "Watermelon, Sugar Baby").
   function cropVarietyName(name, crop) {
@@ -441,7 +452,7 @@
       : `<p class="seed-note"><span class="muted">Set your USDA zone in ⚙️ Settings to see harden-off &amp; transplant timing.</span></p>`;
 
     return `
-      <article class="card seedling-card" data-id="${p.id}">
+      <article class="card seedling-card" data-id="${escapeHtml(p.id)}">
         <div class="card-top">
           <h3>${escapeHtml(trackedDisplayName(p))}</h3>
           <div class="badge-stack">
@@ -528,7 +539,7 @@
     }
 
     return `
-      <article class="card ${st.cls}${harvestClass}" data-id="${p.id}">
+      <article class="card ${st.cls}${harvestClass}" data-id="${escapeHtml(p.id)}">
         <div class="card-top">
           <h3>${escapeHtml(trackedDisplayName(p))}</h3>
           <div class="badge-stack">
@@ -1317,9 +1328,10 @@
     if (p.depthIn) facts.push(`<span>🕳️ ${p.depthIn}&quot; deep</span>`);
     if (p.germDays) facts.push(`<span>🌱 Germ ${p.germDays}d</span>`);
 
-    const src = (p.sources || []).map((s) =>
-      s.url ? `<a href="${s.url}" target="_blank" rel="noopener">${escapeHtml(s.name)}</a>` : escapeHtml(s.name)
-    ).join(", ");
+    const src = (p.sources || []).map((s) => {
+      const u = safeUrl(s.url);
+      return u ? `<a href="${escapeHtml(u)}" target="_blank" rel="noopener">${escapeHtml(s.name)}</a>` : escapeHtml(s.name);
+    }).join(", ");
 
     const latinLine = p.latin
       ? `<p class="latin">${escapeHtml(p.crop || "")} · <em>${escapeHtml(p.latin)}</em></p>`
@@ -1395,7 +1407,7 @@
       : `<button class="water-btn" data-act="add">+ Add to my garden</button>`;
 
     return `
-      <article class="card guide-card${p.custom ? " custom-card" : ""}" data-id="${p.id}">
+      <article class="card guide-card${p.custom ? " custom-card" : ""}" data-id="${escapeHtml(p.id)}">
         <div class="card-top">
           <h3>${isGroup ? escapeHtml(p.crop) : escapeHtml(cropVarietyName(p.name, p.crop))}${p.custom ? ` <span class="badge custom-badge">Custom</span>` : ""}</h3>
           ${nowBadge}
@@ -1547,10 +1559,16 @@
 
   async function fetchWeather() {
     if (!rainLoc) return;
+    const lat = Number(rainLoc.lat), lon = Number(rainLoc.lon);
+    if (!isFinite(lat) || !isFinite(lon)) {
+      wxError = "Saved location looks invalid. Set it again with GPS or a town/city.";
+      renderWeatherPanel();
+      return;
+    }
     wxBusy = true; wxError = ""; renderWeatherPanel();
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${rainLoc.lat}` +
-        `&longitude=${rainLoc.lon}&daily=precipitation_sum,temperature_2m_max,apparent_temperature_max,relative_humidity_2m_max` +
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}` +
+        `&longitude=${lon}&daily=precipitation_sum,temperature_2m_max,apparent_temperature_max,relative_humidity_2m_max` +
         `&past_days=7&forecast_days=${Math.max(2, CLIMATE_FORECAST_DAYS + 1)}` +
         `&precipitation_unit=inch&temperature_unit=fahrenheit&timezone=auto`;
       const res = await fetch(url);
@@ -1966,7 +1984,7 @@
     if (!f.placeBed) return;
     if (placeBedRow) placeBedRow.hidden = beds.length === 0;
     f.placeBed.innerHTML = '<option value="">— Select —</option><option value="none">Not in a bed</option>' +
-      beds.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
+      beds.map((b) => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name)}</option>`).join("");
     f.placeBed.value = selectedId || "";
     toggleLocationField();
   }
@@ -2037,7 +2055,7 @@
     (b.plantings || []).forEach((pl) => {
       const w = pl.wCells || 1, h = pl.hCells || 1;
       const x0 = off + pl.col, y0 = off + pl.row;
-      const attrs = interactive ? ` data-planting="${pl.id}"` : "";
+      const attrs = interactive ? ` data-planting="${escapeHtml(pl.id)}"` : "";
       p.push(`<g class="bed-planting"${attrs}>`);
       p.push(`<rect x="${x0 + 0.07}" y="${y0 + 0.07}" width="${w - 0.14}" height="${h - 0.14}" rx="0.12" fill="#e5f2df" stroke="#5a9247" stroke-width="0.05" vector-effect="non-scaling-stroke"></rect>`);
       const labelHere = interactive && pl.name;
@@ -2052,7 +2070,7 @@
       }
       if (pl.qty > 1) p.push(`<text x="${x0 + w - 0.1}" y="${y0 + 0.1}" text-anchor="end" dominant-baseline="hanging" font-size="0.22" fill="#3a5a2c" style="pointer-events:none">×${pl.qty}</text>`);
       if (conflicts.has(pl.id)) p.push(`<rect x="${x0 + 0.02}" y="${y0 + 0.02}" width="${w - 0.04}" height="${h - 0.04}" rx="0.14" fill="none" stroke="#e6893a" stroke-width="0.08" stroke-dasharray="0.16 0.12" vector-effect="non-scaling-stroke" pointer-events="none"></rect>`);
-      if (interactive && showHandles) p.push(`<rect class="pl-handle" data-resize-planting="${pl.id}" x="${x0 + w - 0.3}" y="${y0 + h - 0.3}" width="0.28" height="0.28" rx="0.06" fill="#5a9247" stroke="#ffffff" stroke-width="0.035" vector-effect="non-scaling-stroke"></rect>`);
+      if (interactive && showHandles) p.push(`<rect class="pl-handle" data-resize-planting="${escapeHtml(pl.id)}" x="${x0 + w - 0.3}" y="${y0 + h - 0.3}" width="0.28" height="0.28" rx="0.06" fill="#5a9247" stroke="#ffffff" stroke-width="0.035" vector-effect="non-scaling-stroke"></rect>`);
       p.push(`</g>`);
     });
     if (needClip) p.push(`</g>`);
@@ -2552,7 +2570,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, buildBackupPayload, readBackup, exportBackup, fsSupported: () => fsSupported, setWeather: (w) => { weather = w; } };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, buildBackupPayload, readBackup, exportBackup, fsSupported: () => fsSupported, escapeHtml, safeUrl, guideCardHtml, setWeather: (w) => { weather = w; } };
   }
 
   render();
