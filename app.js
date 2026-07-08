@@ -720,18 +720,95 @@
       location: (has("location") && data.location && typeof data.location === "object") ? data.location : null,
     };
   }
-  function exportBackup() {
-    const blob = new Blob([JSON.stringify(buildBackupPayload(), null, 2)], { type: "application/json" });
+  // A single, stable backup filename so re-exports overwrite/replace one file
+  // instead of piling up dated copies.
+  const BACKUP_FILENAME = "garden-backup.json";
+  const fsSupported = typeof window !== "undefined" && typeof window.showSaveFilePicker === "function";
+
+  // Remember the user's chosen backup file (File System Access API) across app
+  // restarts via IndexedDB, so future backups overwrite THE SAME file with no
+  // prompt and no duplicates. Only supported on Chromium (Android/desktop); iOS
+  // Safari falls back to a normal download below.
+  const FS_DB = "garden-fs", FS_STORE = "handles", FS_KEY = "backupFile";
+  function idbTx(mode, run) {
+    return new Promise((resolve, reject) => {
+      let req;
+      try { req = window.indexedDB.open(FS_DB, 1); }
+      catch (e) { reject(e); return; }
+      req.onupgradeneeded = () => req.result.createObjectStore(FS_STORE);
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const db = req.result;
+        try {
+          const tx = db.transaction(FS_STORE, mode);
+          const op = run(tx.objectStore(FS_STORE));
+          tx.oncomplete = () => { db.close(); resolve(op ? op.result : undefined); };
+          tx.onerror = () => { db.close(); reject(tx.error); };
+          tx.onabort = () => { db.close(); reject(tx.error); };
+        } catch (e) { try { db.close(); } catch (_) {} reject(e); }
+      };
+    });
+  }
+  const saveFileHandle = (h) => idbTx("readwrite", (s) => s.put(h, FS_KEY));
+  const loadFileHandle = () => idbTx("readonly", (s) => s.get(FS_KEY));
+  const clearFileHandle = () => idbTx("readwrite", (s) => s.delete(FS_KEY));
+
+  async function ensureRW(handle) {
+    const opts = { mode: "readwrite" };
+    if ((await handle.queryPermission(opts)) === "granted") return true;
+    if ((await handle.requestPermission(opts)) === "granted") return true;
+    return false;
+  }
+  async function writeToHandle(handle, text) {
+    const w = await handle.createWritable();
+    await w.write(text);
+    await w.close();
+  }
+  function downloadBackup(text) {
+    const blob = new Blob([text], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `garden-backup-${todayStr()}.json`;
+    a.download = BACKUP_FILENAME;
     a.click();
     URL.revokeObjectURL(url);
+  }
+  async function exportBackup() {
+    const text = JSON.stringify(buildBackupPayload(), null, 2);
+    if (fsSupported) {
+      try {
+        // Try to reuse the previously chosen file (true in-place overwrite).
+        let handle = null;
+        try { handle = await loadFileHandle(); } catch (e) { handle = null; }
+        if (handle && !(await ensureRW(handle))) handle = null;
+        if (!handle) {
+          handle = await window.showSaveFilePicker({
+            suggestedName: BACKUP_FILENAME,
+            types: [{ description: "Garden backup", accept: { "application/json": [".json"] } }],
+          });
+          try { await saveFileHandle(handle); } catch (e) { /* handle not persistable; still write once */ }
+        }
+        await writeToHandle(handle, text);
+        markBackedUp();
+        return;
+      } catch (err) {
+        if (err && err.name === "AbortError") return; // user cancelled the picker
+        // Chosen file was moved/deleted or another error — forget it and fall back.
+        try { await clearFileHandle(); } catch (e) { /* ignore */ }
+      }
+    }
+    downloadBackup(text);
     markBackedUp();
   }
   document.getElementById("exportBtn").addEventListener("click", exportBackup);
-
+  // One-time hint tailored to what this device supports.
+  (function setBackupHint() {
+    const el = document.getElementById("backupHint");
+    if (!el) return;
+    el.textContent = fsSupported
+      ? "Tip: the first backup lets you pick a file; later backups overwrite that same file, so you won't collect duplicates."
+      : "Tip: each backup is a full snapshot — you only ever need the newest one, so it's safe to delete older backup files.";
+  })();
   const importFile = document.getElementById("importFile");
   document.getElementById("importBtn").addEventListener("click", () => importFile.click());
   importFile.addEventListener("change", () => {
@@ -2475,7 +2552,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, buildBackupPayload, readBackup, setWeather: (w) => { weather = w; } };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, buildBackupPayload, readBackup, exportBackup, fsSupported: () => fsSupported, setWeather: (w) => { weather = w; } };
   }
 
   render();
