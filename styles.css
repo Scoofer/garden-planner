@@ -284,6 +284,7 @@ select, input, textarea {
 
 .variety-picker { display: flex; flex-direction: column; gap: 0.2rem; margin: 0.1rem 0 0.5rem; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
 .variety-picker select { font-size: 0.9rem; padding: 0.35rem 0.5rem; border-radius: 8px; border: 1px solid #cdd8c4; background: #fbfdf7; color: var(--text); font-weight: 600; max-width: 100%; }
+.variety-picker .seed-now-hint { font-weight: 600; color: #2e7d32; font-size: 0.72rem; }
 
 /* Seed-starting — My Garden seasonal to-dos */
 .seed-tasks { margin: 0 0 1rem; padding: 0.75rem 0.9rem; background: #f2f8ec; border: 1px solid #d6e6c6; border-radius: 12px; }

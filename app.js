@@ -954,8 +954,24 @@
       return { key: "transplant", label: "🌱 Safe to transplant now", cls: "seed-transplant", date: t.tpEnd };
     return null;
   }
-  function fmtSeedDate(d, withYear) {
-    return d.toLocaleDateString(undefined, withYear
+  // True if TODAY falls within any indoor seed-starting window (spring OR fall)
+  // for this crop in the given zone. Unlike seedAction (spring-only), this scans
+  // every "Start indoors" method so fall sowings light up too.
+  function canSeedStartNow(plant, zone, today) {
+    const z = DATA.ZONE_FROST[zone];
+    if (!z || z.frostFree) return false;
+    const year = today.getFullYear();
+    return (plant.methods || []).some((m) => {
+      if (!/start indoors/i.test(m.type)) return false;
+      const md = m.anchor === "firstFall" ? z.firstFall : z.lastFrost;
+      if (!md) return false;
+      const base = new Date(year, md[0] - 1, md[1]);
+      const start = new Date(base.getTime() + (m.startWk || 0) * 7 * MS_PER_DAY);
+      const end = new Date(base.getTime() + (m.endWk || 0) * 7 * MS_PER_DAY);
+      return today >= start && today <= end;
+    });
+  }
+  function fmtSeedDate(d, withYear) {    return d.toLocaleDateString(undefined, withYear
       ? { month: "short", day: "numeric", year: "numeric" }
       : { month: "short", day: "numeric" });
   }
@@ -1138,11 +1154,19 @@
       ? `<span class="badge thirsty">Plant now</span>` : "";
 
     const varietySelect = isGroup
-      ? `<label class="variety-picker">Variety
-          <select class="variety-select" data-crop="${escapeHtml(groupKeyOf(p))}">
-            ${group.map((v) => `<option value="${escapeHtml(v.id)}"${v.id === p.id ? " selected" : ""}>${escapeHtml(varietyLabel(v))}</option>`).join("")}
-          </select>
-        </label>`
+      ? (() => {
+          const today = new Date();
+          const anyNow = group.some((v) => canSeedStartNow(v, currentZone, today));
+          const opts = group.map((v) => {
+            const now = canSeedStartNow(v, currentZone, today);
+            return `<option value="${escapeHtml(v.id)}"${v.id === p.id ? " selected" : ""}>${escapeHtml(varietyLabel(v))}${now ? " 🌱" : ""}</option>`;
+          }).join("");
+          return `<label class="variety-picker">Variety${anyNow ? ` <span class="seed-now-hint">🌱 = sow seeds now</span>` : ""}
+            <select class="variety-select" data-crop="${escapeHtml(groupKeyOf(p))}">
+              ${opts}
+            </select>
+          </label>`;
+        })()
       : "";
 
     let timing;
@@ -2403,7 +2427,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, setWeather: (w) => { weather = w; } };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, setWeather: (w) => { weather = w; } };
   }
 
   render();
