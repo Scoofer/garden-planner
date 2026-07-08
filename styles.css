@@ -183,6 +183,8 @@ select, input, textarea {
 .badge.seed-soon { background: #eef5e4; color: #5a7a3a; }
 .badge.seed-harden { background: #e0f0f4; color: #1f6b7a; }
 .badge.seed-transplant { background: #d8ead8; color: #2e6b3e; }
+.badge.seedling { background: #dcecc9; color: #33661a; }
+.badge.seed-growing { background: #eef5e4; color: #4a7a3a; }
 .badge.heat-risk { background: #ffe0d6; color: #b23b12; }
 .badge.humid-risk { background: #e0eef0; color: #256b73; }
 .field-hint { display: block; font-weight: 400; font-size: 0.78rem; color: var(--muted); margin-top: 0.2rem; }
@@ -191,6 +193,11 @@ select, input, textarea {
 .meta { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; }
 .meta span { display: inline-flex; align-items: center; gap: 0.3rem; }
 .meta span.mulch-chip { color: #7a5a00; background: #f7f0dd; padding: 0.05rem 0.4rem; border-radius: 6px; font-weight: 600; }
+.meta span.transplant-chip { color: #2e6b3e; background: #e6f2e6; padding: 0.05rem 0.4rem; border-radius: 6px; font-weight: 600; }
+.seedling-card { border-left: 4px solid #7fae4e; background: #fbfdf6; }
+.seed-note { margin: 0.4rem 0 0; font-size: 0.85rem; line-height: 1.35; color: var(--text); }
+.seed-note.seed-harden { color: #1f6b7a; }
+.seed-note.seed-transplant { color: #2e6b3e; }
 .notes { margin: 0.6rem 0 0; font-size: 0.88rem; white-space: pre-wrap; }
 
 .card-actions { display: flex; gap: 0.5rem; margin-top: 0.85rem; flex-wrap: wrap; }

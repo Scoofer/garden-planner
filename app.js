@@ -428,13 +428,47 @@
     if (typeof renderSeedTasks === "function") renderSeedTasks();
   }
 
+  function seedlingCardHtml(p) {
+    const status = seedlingStatus(p);
+    const meta = [];
+    if (p.location) meta.push(`<span>📍 ${escapeHtml(p.location)}</span>`);
+    if (p.sun) meta.push(`<span>☀️ ${escapeHtml(p.sun)}</span>`);
+    if (p.sownIndoors) meta.push(`<span>🌰 Sown indoors ${fmtDate(p.sownIndoors)}</span>`);
+
+    const statusBadge = status ? `<span class="badge ${status.cls}">${status.label}</span>` : "";
+    const note = status
+      ? `<p class="seed-note ${status.cls}">${escapeHtml(status.detail)}</p>`
+      : `<p class="seed-note"><span class="muted">Set your USDA zone in ⚙️ Settings to see harden-off &amp; transplant timing.</span></p>`;
+
+    return `
+      <article class="card seedling-card" data-id="${p.id}">
+        <div class="card-top">
+          <h3>${escapeHtml(trackedDisplayName(p))}</h3>
+          <div class="badge-stack">
+            <span class="badge seedling">🌱 Seedling (indoors)</span>
+            ${statusBadge}
+          </div>
+        </div>
+        ${meta.length ? `<p class="meta">${meta.join("")}</p>` : ""}
+        ${note}
+        ${p.notes ? `<p class="notes">${escapeHtml(p.notes)}</p>` : ""}
+        <div class="card-actions">
+          <button class="water-btn" data-act="move-garden">🌿 Move to garden</button>
+          <button data-act="edit">Edit</button>
+          <button data-act="delete">Delete</button>
+        </div>
+      </article>`;
+  }
+
   function cardHtml(p) {
+    if (p.stage === "seedling") return seedlingCardHtml(p);
     const st = waterStatus(p);
     const base = effectiveWaterBase(p);
     const meta = [];
     if (p.location) meta.push(`<span>📍 ${escapeHtml(p.location)}</span>`);
     if (p.sun) meta.push(`<span>☀️ ${escapeHtml(p.sun)}</span>`);
     if (p.planted) meta.push(`<span>🌱 Planted ${fmtDate(p.planted)}</span>`);
+    if (p.sownIndoors) meta.push(`<span class="transplant-chip">🌿 Transplanted</span>`);
     if (p.lastWatered) meta.push(`<span>💧 Watered ${fmtDate(p.lastWatered)}</span>`);
     if (p.interval) meta.push(`<span>🔁 Every ${p.interval}d</span>`);
     if (p.mulched) meta.push(`<span class="mulch-chip">🌾 Mulched → ~${effectiveInterval(p)}d</span>`);
@@ -529,6 +563,8 @@
       f.sun.value = plant.sun || "";
       f.notes.value = plant.notes || "";
       if (f.mulched) f.mulched.checked = !!plant.mulched;
+      if (f.startedIndoors) f.startedIndoors.checked = plant.stage === "seedling";
+      if (f.sownIndoors) f.sownIndoors.value = plant.sownIndoors || "";
       dialogMeta = { guideId: plant.guideId || null, spacingIn: plant.spacingIn || null };
       const cur = plantingBed(plant);
       // In a bed -> its bed; has a free-text location -> "Not in a bed"; else neutral.
@@ -538,11 +574,24 @@
       f.id.value = "";
       f.planted.value = todayStr();
       f.interval.value = 3;
+      if (f.startedIndoors) f.startedIndoors.checked = false;
+      if (f.sownIndoors) f.sownIndoors.value = "";
       dialogMeta = null;
       fillBedPicker("");
     }
+    toggleSeedlingFields();
     dialog.showModal();
     f.name.focus();
+  }
+
+  // Show/hide the seed-starting fields based on the "started indoors" toggle.
+  function toggleSeedlingFields() {
+    const on = !!(f.startedIndoors && f.startedIndoors.checked);
+    const sownRow = document.getElementById("sownIndoorsRow");
+    const plantedHint = document.getElementById("plantedHint");
+    if (sownRow) sownRow.hidden = !on;
+    if (plantedHint) plantedHint.hidden = !on;
+    if (on && f.sownIndoors && !f.sownIndoors.value) f.sownIndoors.value = todayStr();
   }
 
   form.addEventListener("submit", (e) => {
@@ -558,6 +607,8 @@
       sun: f.sun.value,
       notes: f.notes.value.trim(),
       mulched: !!(f.mulched && f.mulched.checked),
+      stage: (f.startedIndoors && f.startedIndoors.checked) ? "seedling" : "garden",
+      sownIndoors: f.sownIndoors ? (f.sownIndoors.value || "") : "",
       lastWatered: existing ? existing.lastWatered : "",
       guideId: dialogMeta ? dialogMeta.guideId : (existing ? existing.guideId : null),
       spacingIn: dialogMeta ? dialogMeta.spacingIn : (existing ? existing.spacingIn : null),
@@ -581,6 +632,7 @@
 
   document.getElementById("cancelBtn").addEventListener("click", () => dialog.close());
   if (f.placeBed) f.placeBed.addEventListener("change", toggleLocationField);
+  if (f.startedIndoors) f.startedIndoors.addEventListener("change", toggleSeedlingFields);
 
   // --- Event delegation for cards ---
   listEl.addEventListener("click", (e) => {
@@ -593,6 +645,12 @@
     const act = btn.dataset.act;
     if (act === "water") {
       plant.lastWatered = todayStr();
+      save();
+      render();
+    } else if (act === "move-garden") {
+      plant.stage = "garden";
+      plant.planted = todayStr();
+      plant.lastWatered = "";
       save();
       render();
     } else if (act === "edit") {
@@ -902,6 +960,46 @@
       : { month: "short", day: "numeric" });
   }
 
+  // Harden-off / transplant timing for a tracked seedling, driven by the zone's
+  // last-frost date (safe-to-transplant). Uses the crop's transplant window when
+  // known, otherwise the last-frost date itself.
+  function seedlingTiming(p) {
+    const zone = currentZone;
+    const z = zone && DATA.ZONE_FROST[zone];
+    if (!z || z.frostFree || !z.lastFrost) return null;
+    const gp = guidePlantFor(p);
+    const year = new Date().getFullYear();
+    const lf = new Date(year, z.lastFrost[0] - 1, z.lastFrost[1]);
+    const addWk = (wk) => new Date(lf.getTime() + wk * 7 * MS_PER_DAY);
+    const tp = ((gp && gp.methods) || []).find((m) => /transplant/i.test(m.type));
+    const transplant = tp ? addWk(tp.startWk) : lf;
+    const tpEnd = tp ? addWk(tp.endWk) : lf;
+    const hardenOff = new Date(transplant.getTime() - 7 * MS_PER_DAY);
+    return { hardenOff, transplant, tpEnd, year, hasGuide: !!gp };
+  }
+
+  // Current lifecycle status for a seedling: growing / harden-off / transplant.
+  function seedlingStatus(p) {
+    const t = seedlingTiming(p);
+    if (!t) return null;
+    const d0 = (x) => { const d = new Date(x); d.setHours(0, 0, 0, 0); return d; };
+    const today = d0(new Date());
+    const ho = d0(t.hardenOff), tp = d0(t.transplant);
+    const daysBetween = (a, b) => Math.round((d0(a).getTime() - d0(b).getTime()) / MS_PER_DAY);
+    if (today.getTime() < ho.getTime()) {
+      const n = daysBetween(ho, today);
+      return { key: "growing", cls: "seed-growing", label: "🌱 Growing indoors",
+        detail: `Harden off around ${fmtSeedDate(t.hardenOff, false)}${n > 0 ? ` (~${n} day${n === 1 ? "" : "s"})` : ""}, then transplant around ${fmtSeedDate(t.transplant, false)}.` };
+    }
+    if (today.getTime() >= ho.getTime() && today.getTime() < tp.getTime()) {
+      const n = daysBetween(tp, today);
+      return { key: "harden", cls: "seed-harden", label: "🌤️ Harden off now",
+        detail: `Set seedlings outside for a few hours a day, increasing over ~1 week. Safe to transplant around ${fmtSeedDate(t.transplant, false)}${n > 0 ? ` (~${n} day${n === 1 ? "" : "s"})` : ""}.` };
+    }
+    return { key: "transplant", cls: "seed-transplant", label: "🌱 Safe to transplant now",
+      detail: `Frost risk has passed for your zone — harden off first if you haven't, then move it to the garden.` };
+  }
+
   // My Garden seasonal reminders: crops whose seed-starting action is due now/soon.
   function renderSeedTasks() {
     const el = document.getElementById("seedTasks");
@@ -1123,6 +1221,7 @@
     f.notes.value = noteParts.filter(Boolean).join(" ");
     dialogMeta = { guideId: gp.id, spacingIn: gp.spacingIn || null };
     fillBedPicker("");
+    toggleSeedlingFields();
     dialog.showModal();
     f.name.focus();
   }
@@ -2221,7 +2320,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, setWeather: (w) => { weather = w; } };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, setWeather: (w) => { weather = w; } };
   }
 
   render();

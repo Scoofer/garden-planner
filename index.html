@@ -173,9 +173,19 @@
         <input type="text" id="location" maxlength="60" placeholder="Pot 3, Balcony, Front yard…" />
       </label>
 
+      <label class="bed-check" id="startedIndoorsRow">
+        <input type="checkbox" id="startedIndoors" name="startedIndoors" /> 🌱 Started from seed indoors (not yet in the garden)
+      </label>
+
+      <label id="sownIndoorsRow" hidden>Sown indoors on
+        <input type="date" id="sownIndoors" />
+        <small class="field-hint">When you started the seeds. Harden-off &amp; transplant timing comes from your zone's frost dates.</small>
+      </label>
+
       <div class="row">
-        <label>Planted on
+        <label id="plantedLabel">Planted on
           <input type="date" id="planted" />
+          <small class="field-hint" id="plantedHint" hidden>Leave blank until you move the seedling to the garden.</small>
         </label>
         <label>Water every (days)
           <input type="number" id="interval" min="1" max="365" value="3" />
