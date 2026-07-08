@@ -1028,6 +1028,29 @@
       `</ul>`;
   }
 
+  // Remembered variety selection per crop group (in-memory, resets on reload).
+  const guideVarietySel = {};
+
+  // Grouping key for the guide: crops with a real crop name group together;
+  // plants without a crop (e.g. some custom plants) stay on their own.
+  function groupKeyOf(p) {
+    return p.crop ? "crop:" + p.crop.trim().toLowerCase() : "id:" + p.id;
+  }
+
+  // Short variety label = the plant name with the crop's base word removed
+  // ("Carbon Tomato" + crop "Tomato (indeterminate)" -> "Carbon").
+  function varietyLabel(p) {
+    const crop = (p.crop || "").trim();
+    const base = crop.split(/[\s(]/)[0];
+    let v = String(p.name || "").trim();
+    if (base) {
+      const re = new RegExp("\\b" + base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "ig");
+      v = v.replace(re, " ").replace(/\s+/g, " ").trim();
+    }
+    v = v.replace(/^[-,]\s*/, "").trim();
+    return v || String(p.name || "");
+  }
+
   function renderGuide() {
     const q = (guideSearch.value || "").trim().toLowerCase();
     const filter = guideFilter.value;
@@ -1035,21 +1058,51 @@
     const hasZone = currentZone && DATA.ZONE_FROST[currentZone];
     const frostFree = hasZone && DATA.ZONE_FROST[currentZone].frostFree;
 
-    let items = guidePlants().filter((p) => {
-      if (!q) return true;
-      return (p.name + " " + (p.crop || "") + " " + (p.latin || "")).toLowerCase().includes(q);
-    });
-    items.sort((a, b) =>
-      cropVarietyName(a.name, a.crop).toLowerCase().localeCompare(cropVarietyName(b.name, b.crop).toLowerCase())
-    );
+    const items = guidePlants();
 
-    if (filter === "now" && hasZone && !frostFree) {
-      items = items.filter((p) => plantMonthSet(p, currentZone).has(thisMonth));
+    // Group all varieties of the same crop, then filter groups by the query so a
+    // search keeps the whole crop group visible with the matching variety active.
+    const groups = new Map();
+    for (const p of items) {
+      const key = groupKeyOf(p);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(p);
     }
 
-    guideListEl.innerHTML = items.map((p) => guideCardHtml(p, hasZone, frostFree, thisMonth)).join("");
+    const matchesQuery = (v) => (v.name + " " + (v.crop || "") + " " + (v.latin || "")).toLowerCase().includes(q);
 
-    if (items.length === 0) {
+    let entries = [];
+    for (const [key, vars] of groups) {
+      vars.sort((a, b) => varietyLabel(a).toLowerCase().localeCompare(varietyLabel(b).toLowerCase()));
+      let matchVar = null;
+      if (q) {
+        matchVar = vars.find(matchesQuery);
+        if (!matchVar) continue;
+      }
+      const active = matchVar
+        || (guideVarietySel[key] && vars.find((v) => v.id === guideVarietySel[key]))
+        || vars[0];
+      entries.push({ key, active, group: vars });
+    }
+
+    // "Plant this month" filter: keep a crop if any variety qualifies, and make
+    // sure the shown variety is one that qualifies.
+    if (filter === "now" && hasZone && !frostFree) {
+      entries = entries.filter((en) => en.group.some((v) => plantMonthSet(v, currentZone).has(thisMonth)));
+      entries.forEach((en) => {
+        if (!plantMonthSet(en.active, currentZone).has(thisMonth)) {
+          const q2 = en.group.find((v) => plantMonthSet(v, currentZone).has(thisMonth));
+          if (q2) en.active = q2;
+        }
+      });
+    }
+
+    const sortName = (en) => (en.group.length > 1 ? en.active.crop : cropVarietyName(en.active.name, en.active.crop));
+    entries.sort((a, b) => sortName(a).toLowerCase().localeCompare(sortName(b).toLowerCase()));
+
+    guideListEl.innerHTML = entries.map((en) => guideCardHtml(en.active, hasZone, frostFree, thisMonth, en.group)).join("");
+
+    if (entries.length === 0) {
       guideEmptyEl.hidden = false;
       guideEmptyEl.textContent = q
         ? "No plants match your search."
@@ -1059,9 +1112,38 @@
     }
   }
 
-  function guideCardHtml(p, hasZone, frostFree, thisMonth) {
+  // Re-render a single crop card when its variety dropdown changes.
+  if (guideListEl) {
+    guideListEl.addEventListener("change", (e) => {
+      const sel = e.target.closest(".variety-select");
+      if (!sel) return;
+      const key = sel.getAttribute("data-crop");
+      guideVarietySel[key] = sel.value;
+      const article = sel.closest(".card");
+      if (!article) return;
+      const thisMonth = new Date().getMonth();
+      const hasZone = currentZone && DATA.ZONE_FROST[currentZone];
+      const frostFree = hasZone && DATA.ZONE_FROST[currentZone].frostFree;
+      const group = guidePlants().filter((p) => groupKeyOf(p) === key);
+      const active = group.find((p) => p.id === sel.value) || group[0];
+      const tmp = document.createElement("div");
+      tmp.innerHTML = guideCardHtml(active, hasZone, frostFree, thisMonth, group);
+      if (tmp.firstElementChild) article.replaceWith(tmp.firstElementChild);
+    });
+  }
+
+  function guideCardHtml(p, hasZone, frostFree, thisMonth, group) {
+    const isGroup = group && group.length > 1;
     const nowBadge = (hasZone && !frostFree && plantMonthSet(p, currentZone).has(thisMonth))
       ? `<span class="badge thirsty">Plant now</span>` : "";
+
+    const varietySelect = isGroup
+      ? `<label class="variety-picker">Variety
+          <select class="variety-select" data-crop="${escapeHtml(groupKeyOf(p))}">
+            ${group.map((v) => `<option value="${escapeHtml(v.id)}"${v.id === p.id ? " selected" : ""}>${escapeHtml(varietyLabel(v))}</option>`).join("")}
+          </select>
+        </label>`
+      : "";
 
     let timing;
     if (p.custom && (!p.methods || !p.methods.length)) {
@@ -1166,10 +1248,11 @@
     return `
       <article class="card guide-card${p.custom ? " custom-card" : ""}" data-id="${p.id}">
         <div class="card-top">
-          <h3>${escapeHtml(cropVarietyName(p.name, p.crop))}${p.custom ? ` <span class="badge custom-badge">Custom</span>` : ""}</h3>
+          <h3>${isGroup ? escapeHtml(p.crop) : escapeHtml(cropVarietyName(p.name, p.crop))}${p.custom ? ` <span class="badge custom-badge">Custom</span>` : ""}</h3>
           ${nowBadge}
           ${seedBadge}
         </div>
+        ${varietySelect}
         ${latinLine}
         ${timing}
         ${seedBlock}
@@ -2320,7 +2403,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, setWeather: (w) => { weather = w; } };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, setWeather: (w) => { weather = w; } };
   }
 
   render();
