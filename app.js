@@ -682,9 +682,46 @@
   });
 
   // --- Backup: export / import ---
+  // Backup schema is versioned and ADDITIVE: newer app versions add top-level
+  // keys but never repurpose old ones, so an old backup still restores on a new
+  // build and a new backup still restores (minus unknown keys) on an old build.
+  // v1 = bare array of plants · v2 = { plants, beds } · v3 = adds customPlants,
+  // zone, location. Plant/bed objects are passed through verbatim so any future
+  // per-item fields survive a round trip.
+  function buildBackupPayload() {
+    return {
+      version: 3,
+      exportedAt: new Date().toISOString(),
+      plants,
+      beds,
+      customPlants,
+      zone: currentZone || null,
+      location: rainLoc || null,
+    };
+  }
+  // Tolerant reader: accepts any known backup shape and only reports fields that
+  // are actually present + well-typed (null = absent). Callers restore just the
+  // present fields, so importing an older backup never wipes data that format
+  // couldn't represent (e.g. a v2 file won't erase your custom plants).
+  function readBackup(data) {
+    if (Array.isArray(data)) {
+      return { plants: data, beds: null, customPlants: null, zone: null, location: null };
+    }
+    if (!data || typeof data !== "object") {
+      return { plants: null, beds: null, customPlants: null, zone: null, location: null };
+    }
+    const has = (k) => Object.prototype.hasOwnProperty.call(data, k);
+    const arr = (k) => (has(k) && Array.isArray(data[k]) ? data[k] : null);
+    return {
+      plants: arr("plants"),
+      beds: arr("beds"),
+      customPlants: arr("customPlants"),
+      zone: (has("zone") && typeof data.zone === "string" && data.zone) ? data.zone : null,
+      location: (has("location") && data.location && typeof data.location === "object") ? data.location : null,
+    };
+  }
   function exportBackup() {
-    const payload = { version: 2, plants, beds };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(buildBackupPayload(), null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -703,18 +740,29 @@
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const data = JSON.parse(reader.result);
-        // v1 backups were a plain array of plants; v2 is { plants, beds }.
-        const newPlants = Array.isArray(data) ? data : (data.plants || []);
-        const newBeds = Array.isArray(data) ? [] : (data.beds || []);
-        if (!Array.isArray(newPlants)) throw new Error("Not a valid backup file.");
-        const bedNote = newBeds.length ? ` and ${newBeds.length} bed(s)` : "";
-        if (confirm(`Import ${newPlants.length} plant(s)${bedNote}? This replaces your current data.`)) {
-          plants = newPlants;
-          beds = newBeds;
+        const b = readBackup(JSON.parse(reader.result));
+        if (!Array.isArray(b.plants)) throw new Error("Not a valid backup file.");
+        const bits = [`${b.plants.length} plant(s)`];
+        if (b.beds) bits.push(`${b.beds.length} bed(s)`);
+        if (b.customPlants) bits.push(`${b.customPlants.length} custom plant(s)`);
+        if (b.zone) bits.push(`zone ${b.zone.toUpperCase()}`);
+        if (confirm(`Import ${bits.join(", ")}? This replaces your current data.`)) {
+          plants = b.plants;
           save();
-          saveBeds();
+          if (b.beds) { beds = b.beds; saveBeds(); }
+          if (b.customPlants) { customPlants = b.customPlants; saveCustomPlants(); }
+          if (b.zone) {
+            currentZone = b.zone;
+            localStorage.setItem(ZONE_KEY, currentZone);
+            if (zoneSel) zoneSel.value = currentZone;
+            if (typeof updateZoneUI === "function") updateZoneUI();
+          }
+          if (b.location) {
+            rainLoc = b.location;
+            localStorage.setItem(RAIN_LOC_KEY, JSON.stringify(rainLoc));
+          }
           render();
+          renderGuide();
           if (!views.beds.hidden) renderBeds();
           updateBackupBanner();
         }
@@ -2427,7 +2475,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, setWeather: (w) => { weather = w; } };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, buildBackupPayload, readBackup, setWeather: (w) => { weather = w; } };
   }
 
   render();
