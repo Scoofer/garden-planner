@@ -721,15 +721,27 @@
     f.name.focus();
   }
 
-  // Show the "pollinator nearby" checkbox only when the plant (matched by name to
-  // the guide) is a fruit tree that isn't self-fertile — the only case it matters.
+  // Tree-specific dialog tweaks. Fruit trees are planted as saplings, so the
+  // "started from seed indoors" seedling flow doesn't apply (and would wrongly
+  // flip the tree into seedling mode). The "pollinator nearby" checkbox only
+  // matters for a fruit tree that isn't self-fertile.
   function toggleTreeFields() {
-    const row = document.getElementById("pollinatorRow");
-    if (!row) return;
     const name = (f.name.value || "").trim().toLowerCase();
     const gp = guidePlants().find((g) => g.name && g.name.toLowerCase() === name);
     const t = treeInfoFor(gp);
-    row.hidden = !(t && !t.selfFertile);
+    const isTree = !!t;
+
+    const pollRow = document.getElementById("pollinatorRow");
+    if (pollRow) pollRow.hidden = !(t && !t.selfFertile);
+
+    const seedRow = document.getElementById("startedIndoorsRow");
+    if (seedRow) {
+      seedRow.hidden = isTree;
+      if (isTree && f.startedIndoors && f.startedIndoors.checked) {
+        f.startedIndoors.checked = false;
+        toggleSeedlingFields();
+      }
+    }
   }
 
   // Show/hide the seed-starting fields based on the "started indoors" toggle.
