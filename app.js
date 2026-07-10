@@ -1545,6 +1545,7 @@
     else if (p.spacingIn) facts.push(`<span>↔️ ${p.spacingIn}&quot; apart</span>`);
     if (p.depthIn) facts.push(`<span>🕳️ ${p.depthIn}&quot; deep</span>`);
     if (p.germDays) facts.push(`<span>🌱 Germ ${p.germDays}d</span>`);
+    if (p.waterEveryDays) facts.push(`<span>💧 Water ~every ${p.waterEveryDays}d</span>`);
 
     const src = (p.sources || []).map((s) => {
       const u = safeUrl(s.url);
@@ -2147,7 +2148,7 @@
       name: meta.name,
       location: b.name,
       planted: todayStr(),
-      interval: 3,
+      interval: meta.waterEveryDays || 3,
       sun: ["Full sun", "Partial sun", "Shade"].includes(meta.sun) ? meta.sun : "",
       notes: (meta.note ? meta.note + " " : "") + `In ${b.name}.`,
       lastWatered: "",
@@ -2464,7 +2465,7 @@
     } else if (spec.startsWith("plant:")) {
       const gp = guidePlants()[parseInt(spec.slice(6), 10)];
       if (!gp) return;
-      armedTool = { kind: "plant", meta: { name: gp.name, spacingIn: gp.spacingIn, sun: gp.sun, guideId: gp.id, note: guideNote(gp) } };
+      armedTool = { kind: "plant", meta: { name: gp.name, spacingIn: gp.spacingIn, sun: gp.sun, guideId: gp.id, waterEveryDays: gp.waterEveryDays || 3, note: guideNote(gp) } };
     }
     if (b) renderBedEditor(b);
   }
