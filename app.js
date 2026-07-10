@@ -2434,6 +2434,11 @@
     circleDims.hidden = !circ;
     roundedRow.hidden = circ;
     borderRow.hidden = circ;
+    // Disable whichever dimension inputs are hidden so they can't bar the form
+    // from submitting via constraint validation (values are read from JS anyway).
+    bedFields.width.disabled = circ;
+    bedFields.length.disabled = circ;
+    bedFields.diameter.disabled = !circ;
   }
   bedFields.shape.addEventListener("change", syncShapeFields);
 
@@ -2470,9 +2475,9 @@
     const name = bedFields.name.value.trim();
     const kind = bedFields.kind.value;
     const shape = bedFields.shape.value;
-    const widthFt = Math.max(1, Math.min(30, parseInt(bedFields.width.value, 10) || 4));
-    const lengthFt = Math.max(1, Math.min(30, parseInt(bedFields.length.value, 10) || 8));
-    const diameterFt = Math.max(1, Math.min(30, parseInt(bedFields.diameter.value, 10) || 4));
+    const widthFt = Math.max(1, Math.min(30, parseFloat(bedFields.width.value) || 4));
+    const lengthFt = Math.max(1, Math.min(30, parseFloat(bedFields.length.value) || 8));
+    const diameterFt = Math.max(1, Math.min(30, parseFloat(bedFields.diameter.value) || 4));
     const rounded = shape === "rect" ? bedFields.rounded.checked : false;
     const border = shape === "rect" ? bedFields.border.checked : false;
     const existing = bedFields.id.value ? beds.find((x) => x.id === bedFields.id.value) : null;
@@ -2570,7 +2575,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, buildBackupPayload, readBackup, exportBackup, fsSupported: () => fsSupported, escapeHtml, safeUrl, guideCardHtml, setWeather: (w) => { weather = w; } };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, buildBackupPayload, readBackup, exportBackup, fsSupported: () => fsSupported, escapeHtml, safeUrl, guideCardHtml, openBedDialog, bedCols, bedRows, getBeds: () => beds, getPlants: () => plants, getCustomPlants: () => customPlants, setWeather: (w) => { weather = w; } };
   }
 
   render();
