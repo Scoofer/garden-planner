@@ -246,6 +246,42 @@ window.GARDEN_DATA = (function () {
       sources: [ANNIES],
     },
     {
+      id: "mount-royal-plum",
+      name: "Mount Royal Plum",
+      category: "fruit-tree",
+      fertilize: { feeder: "Moderate", tips: "Feed once in early spring, before growth starts, with compost or a balanced fertilizer spread around the drip line. Go easy — too much nitrogen pushes soft, disease-prone leafy growth at the expense of fruit. An annual spring compost mulch is usually plenty for an established tree." },
+      harvest: {
+        cues: "Ripe when the blue-purple skin dusts over with a silvery bloom and the fruit gives slightly to a gentle squeeze and pulls free with a light twist. Taste-test one — flavor sweetens noticeably in the last few days.",
+        how: "Pick by hand with a gentle twist, going over the tree several times across 1–2 weeks since fruit ripens unevenly. Handle gently to keep the protective bloom intact.",
+        storage: "Ripe plums keep in the fridge up to ~2 weeks; ripen firm ones at room temperature first. The freestone flesh freezes, dries, cans, and makes excellent jam and prunes.",
+      },
+      // Tree-specific detail (fruit trees carry a `tree` block rather than SFG spacing math).
+      tree: {
+        type: "European plum (dwarf)",
+        bloomGroup: "mid",          // early | mid | late — used for cross-pollination overlap
+        selfFertile: true,          // one tree sets fruit on its own
+        pollenSterile: false,       // some varieties can't pollinate others (e.g. some apples)
+        yearsToFruit: 3,            // earliest bearing age from a young grafted tree
+        matureSize: "8–12 ft tall and wide on dwarf rootstock",
+        spacingFt: 10,
+        rootstock: "Dwarf",
+        minZone: 4, maxZone: 8,     // USDA hardiness range for the "zone fit" check
+        pruneSeason: "late winter to early spring",
+        pruneNote: "Prune while dormant in late winter to early spring, thinning to an open, airy vase shape. Avoid pruning in autumn or wet weather — fresh cuts then invite silver-leaf disease and canker. Remove dead, crossing, or inward-growing branches, and thin heavy fruit set so limbs don't break.",
+        pollinationNote: "Self-fertile — a single tree will set a good crop on its own. A second European plum blooming at the same time nearby can boost yields even more.",
+      },
+      crop: "Plum", latin: "Prunus domestica",
+      sun: "Full sun", spacingIn: 120, rowIn: 144, depthIn: null,
+      daysToMaturity: null, germDays: null, perennial: true,
+      climate: { heatF: 92, cat: "fruit", humid: true },
+      harvestSeason: { anchor: "firstFall", startWk: -5, endWk: -3, establishYears: 3 },
+      methods: [
+        { type: "Plant bare-root / transplant", anchor: "lastFrost", startWk: -3, endWk: 3 },
+      ],
+      tips: "Cold-hardy European plum from Quebec, prized for dependable crops of sweet, freestone blue plums in short-season gardens. Plant in full sun with good air drainage; keep roots cool and evenly moist with mulch. Thin a heavy fruit set so branches don't break.",
+      sources: [GENERAL],
+    },
+    {
       id: "green-beans-pole",
       name: "Green Beans (pole)",
       fertilize: { feeder: "Light", tips: "A legume that fixes its own nitrogen, so go easy on N feeds (they delay flowering). Compost or a balanced low-nitrogen feed at planting; these long-season climbers appreciate a light mid-season feed." },

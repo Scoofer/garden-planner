@@ -282,6 +282,15 @@ select, input, textarea {
 .succession-guide p { margin: 0.25rem 0; font-size: 0.85rem; line-height: 1.35; }
 .succession-guide strong { color: var(--text); }
 
+.tree-guide { margin-top: 0.6rem; padding: 0.6rem 0.75rem; background: #f4f0e6; border: 1px solid #e0d6bd; border-radius: 10px; }
+.tree-guide h4 { margin: 0 0 0.35rem; font-size: 0.9rem; color: #6b551e; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.tree-guide p { margin: 0.25rem 0; font-size: 0.85rem; line-height: 1.35; }
+.tree-guide strong { color: var(--text); }
+.tree-note { margin: 0.5rem 0 0; font-size: 0.85rem; line-height: 1.35; color: var(--text); background: #f6f2e8; border: 1px solid #e4dbc4; border-radius: 8px; padding: 0.4rem 0.6rem; }
+.poll-ok { color: #2f6b3e; font-weight: 600; }
+.poll-warn { color: #8a4b00; font-weight: 600; }
+.badge.poll-warn { background: #ffe9cf; color: #8a4b00; }
+
 .variety-picker { display: flex; flex-direction: column; gap: 0.2rem; margin: 0.1rem 0 0.5rem; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
 .variety-picker select { font-size: 0.9rem; padding: 0.35rem 0.5rem; border-radius: 8px; border: 1px solid #cdd8c4; background: #fbfdf7; color: var(--text); font-weight: 600; max-width: 100%; }
 .variety-picker .seed-now-hint { font-weight: 600; color: #2e7d32; font-size: 0.72rem; }

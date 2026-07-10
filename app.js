@@ -263,6 +263,107 @@
     return res;
   }
 
+  // --- Fruit trees -----------------------------------------------------------
+  // Coarse meteorological season for a date (used to word harvest/countdown copy).
+  function seasonName(d) {
+    if (!d || isNaN(d.getTime())) return "";
+    const m = d.getMonth(); // 0=Jan
+    if (m === 11 || m <= 1) return "winter";
+    if (m <= 4) return "spring";
+    if (m <= 7) return "summer";
+    return "fall";
+  }
+
+  // The tree profile for a plant (guide entry or a tracked plant), if it's a tree.
+  function treeInfoFor(p) {
+    if (!p) return null;
+    if (p.tree && p.category === "fruit-tree") return p.tree;
+    const gp = guidePlantFor(p);
+    if (gp && gp.category === "fruit-tree" && gp.tree) return gp.tree;
+    return null;
+  }
+  function isFruitTree(p) { return !!treeInfoFor(p); }
+
+  // Leading USDA zone number ("4b" -> 4), for hardiness-range checks.
+  function zoneNum(z) {
+    const m = String(z || "").match(/\d+/);
+    return m ? parseInt(m[0], 10) : null;
+  }
+  // Is the tree's hardiness range a fit for the selected zone?
+  function zoneFitFor(t) {
+    const zn = zoneNum(currentZone);
+    if (zn == null || !t || (t.minZone == null && t.maxZone == null)) return null;
+    const below = t.minZone != null && zn < t.minZone;
+    const above = t.maxZone != null && zn > t.maxZone;
+    const range = `${t.minZone != null ? t.minZone : "?"}–${t.maxZone != null ? t.maxZone : "?"}`;
+    if (below) return { ok: false, cold: true, range, msg: `⚠️ Marginal — rated for USDA zones ${range}; your zone ${String(currentZone).toUpperCase()} may be too cold. Site it in a sheltered spot and protect young trees over winter.` };
+    if (above) return { ok: false, cold: false, range, msg: `⚠️ Rated for USDA zones ${range} — your zone ${String(currentZone).toUpperCase()} may be too warm; it may not get the winter chill it needs to fruit well.` };
+    return { ok: true, range, msg: `✓ Hardy in your zone (rated USDA ${range}).` };
+  }
+
+  const BLOOM_ORDER = ["early", "mid", "late"];
+  // Two trees can cross-pollinate if their bloom times overlap (same or adjacent group).
+  function bloomCompatible(a, b) {
+    if (!a || !b) return false;
+    const ia = BLOOM_ORDER.indexOf(a.bloomGroup);
+    const ib = BLOOM_ORDER.indexOf(b.bloomGroup);
+    if (ia < 0 || ib < 0) return true; // unknown bloom timing -> don't rule it out
+    return Math.abs(ia - ib) <= 1;
+  }
+  // Same fruit type (apples pollinate apples, plums pollinate plums, ...).
+  function samePollinationGroup(a, b) {
+    const ca = ((a.crop || plantCrop(a)) || "").trim().toLowerCase();
+    const cb = ((b.crop || plantCrop(b)) || "").trim().toLowerCase();
+    return !!ca && ca === cb;
+  }
+  // Tracked garden trees (excluding one id, and excluding seedlings).
+  function trackedTreesExcept(id) {
+    return plants.filter((p) => p.id !== id && p.stage !== "seedling" && isFruitTree(p));
+  }
+  // Resolve a tree's pollination situation for a tracked plant. Returns null for
+  // non-trees. Handles: self-fertile; a compatible partner already tracked; the
+  // "a compatible pollinator is nearby" flag; or needs-a-partner (with suggestions).
+  function pollinationStatus(p) {
+    const t = treeInfoFor(p);
+    if (!t) return null;
+    if (t.selfFertile) {
+      return { ok: true, cls: "poll-ok", label: "Self-fertile",
+        detail: t.pollinationNote || "Self-fertile — a single tree will set fruit on its own." };
+    }
+    const partners = trackedTreesExcept(p.id).filter((o) => {
+      const ot = treeInfoFor(o);
+      return ot && !ot.pollenSterile && samePollinationGroup(o, p) &&
+        bloomCompatible(ot, t) && o.name.toLowerCase() !== (p.name || "").toLowerCase();
+    });
+    if (partners.length) {
+      const names = partners.map((o) => trackedDisplayName(o));
+      return { ok: true, cls: "poll-ok", label: "Pollination OK",
+        detail: `Your ${listWords(names)} can cross-pollinate this tree.` };
+    }
+    if (p.pollinatorNearby) {
+      return { ok: true, cls: "poll-ok", label: "Pollination OK",
+        detail: "You noted a compatible tree nearby (e.g. a neighbor's) — that will pollinate this one." };
+    }
+    // Needs a partner: suggest compatible varieties from the guide the user doesn't grow.
+    const crop = (plantCrop(p) || t.type || "tree").toLowerCase();
+    const owned = new Set(plants.map((o) => (o.name || "").toLowerCase()));
+    const sugg = guidePlants().filter((g) => {
+      const gt = g.category === "fruit-tree" && g.tree;
+      return gt && !g.tree.pollenSterile && samePollinationGroup(g, p) &&
+        bloomCompatible(g.tree, t) && (g.name || "").toLowerCase() !== (p.name || "").toLowerCase() &&
+        !owned.has((g.name || "").toLowerCase());
+    }).map((g) => trackedDisplayName(g));
+    const suggStr = sugg.length ? ` (e.g. ${listWords(sugg.slice(0, 3))})` : "";
+    return { ok: false, cls: "poll-warn", label: "Needs a pollinator",
+      detail: `Needs a different, compatible ${crop} blooming nearby to set fruit. Add one${suggStr}, or tick “a compatible pollinator is nearby” in this plant's edit dialog if a neighbor already has one.` };
+  }
+  function listWords(arr) {
+    if (!arr.length) return "";
+    if (arr.length === 1) return arr[0];
+    if (arr.length === 2) return arr[0] + " and " + arr[1];
+    return arr.slice(0, -1).join(", ") + ", and " + arr[arr.length - 1];
+  }
+
   // --- Succession sowing planner (planning calendar) ------------------------
   // Given a crop's succession profile, zone frost dates, and days-to-maturity,
   // compute the full-season sowing schedule: first/last safe sow dates, how many
@@ -506,8 +607,15 @@
       const startStr = season.start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
       const endStr = season.end.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
       const cueHtml = season.cues ? `<br><span class="cue">${escapeHtml(season.cues)}</span>` : "";
+      const seasonWord = seasonName(season.start) || "harvest";
+      const capSeason = seasonWord.charAt(0).toUpperCase() + seasonWord.slice(1);
       if (season.state === "establishing") {
-        harvestNote = `<p class="harvest-note">🌱 Establishing — first harvest spring ${season.firstHarvestYear}. <span class="muted">Let the crowns build for now.</span></p>`;
+        if (isFruitTree(p)) {
+          const yrs = season.firstHarvestYear - new Date().getFullYear();
+          harvestNote = `<p class="harvest-note">🌳 ${yrs > 0 ? `~${yrs} year${yrs === 1 ? "" : "s"} to first fruit` : "First fruit expected soon"} <span class="muted">(first crop ~${seasonWord} ${season.firstHarvestYear})</span>. Let it build roots and structure for now.</p>`;
+        } else {
+          harvestNote = `<p class="harvest-note">🌱 Establishing — first harvest ${seasonWord} ${season.firstHarvestYear}. <span class="muted">Let the crowns build for now.</span></p>`;
+        }
       } else if (season.state === "ready") {
         harvestNote = `<p class="harvest-note ready">🧺 In harvest season <span class="muted">(through ${endStr})</span>${cueHtml}</p>`;
         harvestClass = " harvest-ready";
@@ -517,7 +625,7 @@
         harvestClass = " harvest-soon";
         harvestBadge = `<span class="badge harvest-soon">🧺 Harvest soon</span>`;
       } else {
-        harvestNote = `<p class="harvest-note">🧺 Spring harvest season <span class="muted">(~${startStr} – ${endStr})</span></p>`;
+        harvestNote = `<p class="harvest-note">🧺 ${capSeason} harvest season <span class="muted">(~${startStr} – ${endStr})</span></p>`;
       }
     }
 
@@ -538,6 +646,20 @@
       climateNote = `<p class="climate-note">${parts.map(escapeHtml).join("<br>")}</p>`;
     }
 
+    // Fruit-tree pollination + pruning guidance.
+    let treeNote = "", pollBadge = "";
+    const tinfoCard = treeInfoFor(p);
+    if (tinfoCard) {
+      const ps = pollinationStatus(p);
+      const parts = [];
+      if (ps) {
+        parts.push(`<span class="${ps.cls}">${ps.ok ? "✅" : "⚠️"} ${escapeHtml(ps.label)}</span> — ${escapeHtml(ps.detail)}`);
+        if (!ps.ok) pollBadge = `<span class="badge poll-warn">🐝 Needs pollinator</span>`;
+      }
+      if (tinfoCard.pruneSeason) parts.push(`✂️ Prune in ${escapeHtml(tinfoCard.pruneSeason)}.`);
+      if (parts.length) treeNote = `<p class="tree-note">${parts.join("<br>")}</p>`;
+    }
+
     return `
       <article class="card ${st.cls}${harvestClass}" data-id="${escapeHtml(p.id)}">
         <div class="card-top">
@@ -545,6 +667,7 @@
           <div class="badge-stack">
             <span class="badge ${st.badge}">${st.label}</span>
             ${harvestBadge}
+            ${pollBadge}
             ${climateBadge}
           </div>
         </div>
@@ -552,6 +675,7 @@
         ${rainNote}
         ${harvestNote}
         ${climateNote}
+        ${treeNote}
         ${p.notes ? `<p class="notes">${escapeHtml(p.notes)}</p>` : ""}
         <div class="card-actions">
           <button class="water-btn" data-act="water">💧 Water now</button>
@@ -574,6 +698,7 @@
       f.sun.value = plant.sun || "";
       f.notes.value = plant.notes || "";
       if (f.mulched) f.mulched.checked = !!plant.mulched;
+      if (f.pollinatorNearby) f.pollinatorNearby.checked = !!plant.pollinatorNearby;
       if (f.startedIndoors) f.startedIndoors.checked = plant.stage === "seedling";
       if (f.sownIndoors) f.sownIndoors.value = plant.sownIndoors || "";
       dialogMeta = { guideId: plant.guideId || null, spacingIn: plant.spacingIn || null };
@@ -591,8 +716,20 @@
       fillBedPicker("");
     }
     toggleSeedlingFields();
+    toggleTreeFields();
     dialog.showModal();
     f.name.focus();
+  }
+
+  // Show the "pollinator nearby" checkbox only when the plant (matched by name to
+  // the guide) is a fruit tree that isn't self-fertile — the only case it matters.
+  function toggleTreeFields() {
+    const row = document.getElementById("pollinatorRow");
+    if (!row) return;
+    const name = (f.name.value || "").trim().toLowerCase();
+    const gp = guidePlants().find((g) => g.name && g.name.toLowerCase() === name);
+    const t = treeInfoFor(gp);
+    row.hidden = !(t && !t.selfFertile);
   }
 
   // Show/hide the seed-starting fields based on the "started indoors" toggle.
@@ -618,6 +755,7 @@
       sun: f.sun.value,
       notes: f.notes.value.trim(),
       mulched: !!(f.mulched && f.mulched.checked),
+      pollinatorNearby: !!(f.pollinatorNearby && f.pollinatorNearby.checked),
       stage: (f.startedIndoors && f.startedIndoors.checked) ? "seedling" : "garden",
       sownIndoors: f.sownIndoors ? (f.sownIndoors.value || "") : "",
       lastWatered: existing ? existing.lastWatered : "",
@@ -644,6 +782,7 @@
   document.getElementById("cancelBtn").addEventListener("click", () => dialog.close());
   if (f.placeBed) f.placeBed.addEventListener("change", toggleLocationField);
   if (f.startedIndoors) f.startedIndoors.addEventListener("change", toggleSeedlingFields);
+  if (f.name) f.name.addEventListener("input", toggleTreeFields);
 
   // --- Event delegation for cards ---
   listEl.addEventListener("click", (e) => {
@@ -1321,10 +1460,12 @@
     }
 
     const facts = [];
+    const tinfo = treeInfoFor(p);
     if (p.daysToMaturity) facts.push(`<span>⏱️ ${p.daysToMaturity} days to harvest</span>`);
-    if (p.perennial) facts.push(`<span>♻️ Perennial</span>`);
+    if (p.perennial) facts.push(`<span>${tinfo ? "🌳 Fruit tree" : "♻️ Perennial"}</span>`);
     if (p.sun) facts.push(`<span>☀️ ${escapeHtml(p.sun)}</span>`);
-    if (p.spacingIn) facts.push(`<span>↔️ ${p.spacingIn}&quot; apart</span>`);
+    if (tinfo && tinfo.spacingFt) facts.push(`<span>↔️ ${tinfo.spacingFt} ft apart</span>`);
+    else if (p.spacingIn) facts.push(`<span>↔️ ${p.spacingIn}&quot; apart</span>`);
     if (p.depthIn) facts.push(`<span>🕳️ ${p.depthIn}&quot; deep</span>`);
     if (p.germDays) facts.push(`<span>🌱 Germ ${p.germDays}d</span>`);
 
@@ -1351,6 +1492,24 @@
           <h4>🌿 Feeding${p.fertilize.feeder ? ` <span class="badge feeder-${p.fertilize.feeder.toLowerCase()}">${escapeHtml(p.fertilize.feeder)} feeder</span>` : ""}</h4>
           ${p.fertilize.tips ? `<p>${escapeHtml(p.fertilize.tips)}</p>` : ""}
         </div>` : "";
+
+    let treeBlock = "";
+    if (tinfo) {
+      const zf = zoneFitFor(tinfo);
+      const cropWord = escapeHtml((p.crop || "variety").toLowerCase());
+      const pollLine = tinfo.selfFertile
+        ? `<p><strong>Pollination:</strong> <span class="poll-ok">✅ Self-fertile</span> — a single tree fruits on its own${tinfo.bloomGroup ? ` (blooms ${escapeHtml(tinfo.bloomGroup)}-season)` : ""}. A second variety nearby can boost yields.</p>`
+        : `<p><strong>Pollination:</strong> <span class="poll-warn">⚠️ Needs a pollinator</span> — plant a different ${cropWord} that blooms in the same${tinfo.bloomGroup ? ` (${escapeHtml(tinfo.bloomGroup)}-season)` : ""} window nearby, or rely on a neighbor's.</p>`;
+      treeBlock = `
+        <div class="tree-guide">
+          <h4>🌳 Tree care</h4>
+          ${pollLine}
+          ${tinfo.yearsToFruit ? `<p><strong>Time to fruit:</strong> ~${tinfo.yearsToFruit} year${tinfo.yearsToFruit === 1 ? "" : "s"} from planting a young tree.</p>` : ""}
+          ${tinfo.matureSize ? `<p><strong>Mature size:</strong> ${escapeHtml(tinfo.matureSize)}.</p>` : ""}
+          ${zf ? `<p><strong>Zone fit:</strong> <span class="${zf.ok ? "poll-ok" : "poll-warn"}">${escapeHtml(zf.msg)}</span></p>` : ""}
+          ${tinfo.pruneNote ? `<p><strong>Pruning:</strong> ${escapeHtml(tinfo.pruneNote)}</p>` : ""}
+        </div>`;
+    }
 
     let seedBlock = "";
     let seedBadge = "";
@@ -1422,6 +1581,7 @@
         ${p.tips ? `<p class="notes">${escapeHtml(p.tips)}</p>` : ""}
         ${harvestBlock}
         ${fertilizeBlock}
+        ${treeBlock}
         ${src ? `<p class="source">📖 Source: ${src}${p.sources[0].retrieved ? ` <span class="muted">(${p.sources[0].retrieved})</span>` : ""}</p>` : ""}
         <div class="card-actions">
           ${actions}
@@ -1466,6 +1626,7 @@
     dialogMeta = { guideId: gp.id, spacingIn: gp.spacingIn || null };
     fillBedPicker("");
     toggleSeedlingFields();
+    toggleTreeFields();
     dialog.showModal();
     f.name.focus();
   }
@@ -1884,6 +2045,8 @@
       ["lettuce", "🥬"], ["onion", "🧅"], ["potato", "🥔"], ["corn", "🌽"],
       ["strawberr", "🍓"], ["basil", "🌿"], ["herb", "🌿"], ["broccoli", "🥦"],
       ["eggplant", "🍆"], ["pumpkin", "🎃"], ["kale", "🥬"], ["radish", "🌶️"],
+      ["apple", "🍎"], ["pear", "🍐"], ["cherry", "🍒"], ["plum", "🌳"],
+      ["peach", "🍑"], ["apricot", "🌳"], ["fig", "🌳"], ["tree", "🌳"],
     ];
     for (const [k, e] of map) if (n.includes(k)) return e;
     return "🌱";
@@ -2146,6 +2309,7 @@
     chips.push(`<button class="chip ${armedTool.kind === "block" ? "on" : ""}" data-tool="block">🧱 Path/Block</button>`);
     chips.push(`<button class="chip ${armedTool.kind === "plant" && armedTool.meta && !armedTool.meta.guideId ? "on" : ""}" data-tool="custom">✏️ Custom…</button>`);
     guidePlants().forEach((gp, i) => {
+      if (gp.category === "fruit-tree") return; // trees don't fit the square-foot grid
       const on = armedTool.kind === "plant" && armedTool.meta && armedTool.meta.guideId === gp.id;
       chips.push(`<button class="chip ${on ? "on" : ""}" data-tool="plant:${i}">${plantEmoji(gp.name)} ${escapeHtml(gp.name)}</button>`);
     });
@@ -2575,7 +2739,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, buildBackupPayload, readBackup, exportBackup, fsSupported: () => fsSupported, escapeHtml, safeUrl, guideCardHtml, openBedDialog, bedCols, bedRows, getBeds: () => beds, getPlants: () => plants, getCustomPlants: () => customPlants, setWeather: (w) => { weather = w; } };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, buildBackupPayload, readBackup, exportBackup, fsSupported: () => fsSupported, escapeHtml, safeUrl, guideCardHtml, openBedDialog, bedCols, bedRows, treeInfoFor, isFruitTree, pollinationStatus, zoneFitFor, bloomCompatible, seasonName, cardHtml, getBeds: () => beds, getPlants: () => plants, setPlants: (v) => { plants = v; }, getCustomPlants: () => customPlants, setWeather: (w) => { weather = w; } };
   }
 
   render();
