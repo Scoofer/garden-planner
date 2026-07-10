@@ -831,6 +831,19 @@
     if (e.target === settingsDialog) settingsDialog.close();
   });
 
+  // Header indicator: a glanceable badge showing the weather-aware feature is on,
+  // without opening Settings. Tapping it jumps straight to the settings panel.
+  const weatherStatusEl = document.getElementById("weatherStatus");
+  function updateWeatherIndicator() {
+    if (weatherStatusEl) weatherStatusEl.hidden = !rainEnabled;
+  }
+  if (weatherStatusEl) {
+    weatherStatusEl.addEventListener("click", () => {
+      renderWeatherPanel();
+      settingsDialog.showModal();
+    });
+  }
+
   // --- Help & glossary dialog ---
   const helpDialog = document.getElementById("helpDialog");
   const glossaryListEl = document.getElementById("glossaryList");
@@ -876,17 +889,19 @@
   // keys but never repurpose old ones, so an old backup still restores on a new
   // build and a new backup still restores (minus unknown keys) on an old build.
   // v1 = bare array of plants · v2 = { plants, beds } · v3 = adds customPlants,
-  // zone, location. Plant/bed objects are passed through verbatim so any future
-  // per-item fields survive a round trip.
+  // zone, location · v4 = adds weatherEnabled (the weather-aware on/off toggle).
+  // Plant/bed objects are passed through verbatim so any future per-item fields
+  // survive a round trip.
   function buildBackupPayload() {
     return {
-      version: 3,
+      version: 4,
       exportedAt: new Date().toISOString(),
       plants,
       beds,
       customPlants,
       zone: currentZone || null,
       location: rainLoc || null,
+      weatherEnabled: !!rainEnabled,
     };
   }
   // Tolerant reader: accepts any known backup shape and only reports fields that
@@ -895,10 +910,10 @@
   // couldn't represent (e.g. a v2 file won't erase your custom plants).
   function readBackup(data) {
     if (Array.isArray(data)) {
-      return { plants: data, beds: null, customPlants: null, zone: null, location: null };
+      return { plants: data, beds: null, customPlants: null, zone: null, location: null, weatherEnabled: null };
     }
     if (!data || typeof data !== "object") {
-      return { plants: null, beds: null, customPlants: null, zone: null, location: null };
+      return { plants: null, beds: null, customPlants: null, zone: null, location: null, weatherEnabled: null };
     }
     const has = (k) => Object.prototype.hasOwnProperty.call(data, k);
     const arr = (k) => (has(k) && Array.isArray(data[k]) ? data[k] : null);
@@ -908,6 +923,7 @@
       customPlants: arr("customPlants"),
       zone: (has("zone") && typeof data.zone === "string" && data.zone) ? data.zone : null,
       location: (has("location") && data.location && typeof data.location === "object") ? data.location : null,
+      weatherEnabled: (has("weatherEnabled") && typeof data.weatherEnabled === "boolean") ? data.weatherEnabled : null,
     };
   }
   // A single, stable backup filename so re-exports overwrite/replace one file
@@ -1013,6 +1029,7 @@
         if (b.beds) bits.push(`${b.beds.length} bed(s)`);
         if (b.customPlants) bits.push(`${b.customPlants.length} custom plant(s)`);
         if (b.zone) bits.push(`zone ${b.zone.toUpperCase()}`);
+        if (b.weatherEnabled === true) bits.push("weather-aware on");
         if (confirm(`Import ${bits.join(", ")}? This replaces your current data.`)) {
           plants = b.plants;
           save();
@@ -1027,6 +1044,14 @@
           if (b.location) {
             rainLoc = b.location;
             localStorage.setItem(RAIN_LOC_KEY, JSON.stringify(rainLoc));
+          }
+          // Restore the weather-aware on/off toggle when the backup records it
+          // (v4+). Older backups omit it, so the current device's setting is left
+          // untouched. When turned on, refresh the forecast so it works right away.
+          if (typeof b.weatherEnabled === "boolean") {
+            rainEnabled = b.weatherEnabled;
+            persistRain();
+            if (rainEnabled && rainLoc) fetchWeather();
           }
           render();
           renderGuide();
@@ -1852,6 +1877,7 @@
   }
 
   function renderWeatherPanel() {
+    if (typeof updateWeatherIndicator === "function") updateWeatherIndicator();
     if (!weatherPanelEl) return;
     let html;
 

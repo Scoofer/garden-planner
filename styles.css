@@ -65,6 +65,20 @@ html, body {
   left: 0.9rem;
   font-size: 1.1rem;
 }
+.weather-status {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 1rem);
+  right: 3.6rem;
+  background: rgba(255, 255, 255, 0.22);
+  border: none;
+  border-radius: 999px;
+  color: #fff;
+  padding: 0.15rem 0.5rem;
+  font-size: 1rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.weather-status:hover { background: rgba(255, 255, 255, 0.32); }
 
 /* Glossary / help dialog */
 .glossary-intro { margin: 0 0 0.6rem; font-size: 0.85rem; color: var(--muted); }
