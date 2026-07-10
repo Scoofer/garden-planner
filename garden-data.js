@@ -479,5 +479,36 @@ window.GARDEN_DATA = (function () {
     },
   };
 
-  return { ZONE_FROST, PLANTS, COMPANIONS };
+  // Plain-language definitions for the gardening terms this app uses. Shown in the
+  // "❓ Help & glossary" dialog. `see` lists extra search keywords/synonyms.
+  const GLOSSARY = [
+    { term: "USDA hardiness zone", see: ["zone", "4b", "half zone", "a b"], def: "A number (1–13) rating how cold a region's winters get — the higher the number, the milder the winter. Each zone splits into an 'a' (colder) and 'b' (warmer) half. The app uses your zone to estimate frost dates and time every planting and harvest." },
+    { term: "Last frost (spring frost date)", see: ["last frost", "spring"], def: "The approximate date of the final hard frost in spring. It's the starting gun for warm-season planting — most timing in the app is measured in weeks before or after this date for your zone." },
+    { term: "First fall frost", see: ["first fall", "autumn frost"], def: "The approximate date of the first hard frost in autumn, which ends the growing season. The app uses it to time fall harvests and to stop succession sowings in time to mature." },
+    { term: "Frost-free zone", see: ["frost free", "tropical"], def: "Very warm zones (11–13) that rarely or never frost. There, planting is driven by wet/dry and cool/hot seasons rather than frost dates, so the app hides frost-based timing." },
+    { term: "Days to maturity", see: ["dtm", "days to harvest"], def: "The typical number of days from planting (or transplanting) until a crop is ready to pick. The app counts down from your planted date to estimate the harvest window." },
+    { term: "Direct sow", see: ["direct seed", "sow outdoors"], def: "Planting seeds straight into the garden where they'll grow, rather than starting them indoors. Best for crops that dislike being transplanted, like carrots and beans." },
+    { term: "Start indoors (seed starting)", see: ["seed starting", "indoors"], def: "Germinating seeds inside weeks before the last frost to get a head start, then moving the young plants outside later. The app builds a sow / harden-off / transplant schedule for crops that benefit." },
+    { term: "Harden off", see: ["hardening off", "acclimate"], def: "Gradually toughening up an indoor-grown seedling by exposing it to outdoor sun, wind, and cooler temperatures over ~7–10 days before transplanting. Skipping this shocks the plant. The app estimates when to begin, based on your frost dates." },
+    { term: "Transplant", see: ["plant out", "set out"], def: "Moving a seedling from its pot (or indoors) into its final spot in the garden. In the app, marking a seedling as moved to the garden records the transplant." },
+    { term: "Seedling", see: ["start", "sprout"], def: "A young plant in its early growth stage. The app tracks a 'seedling (indoors)' stage separately so you can see what's still being raised versus what's out in the garden." },
+    { term: "Succession sowing", see: ["succession", "staggered planting"], def: "Sowing the same crop in small batches every couple of weeks instead of all at once, so you harvest a steady supply rather than one big glut. The app suggests a sowing schedule for suitable crops." },
+    { term: "Thinning", see: ["thin seedlings"], def: "Removing some young seedlings so the remaining ones have enough room, light, and nutrients to size up. Crowded roots (like carrots) stay small and misshapen without it." },
+    { term: "Feeder (heavy / moderate / light)", see: ["feeder", "heavy feeder", "nutrients", "fertilize"], def: "How hungry a crop is for nutrients. Heavy feeders (tomatoes, brassicas, corn) want rich soil and regular feeding; light feeders get by on less. The app labels each crop and tailors its feeding tips." },
+    { term: "Companion planting", see: ["companions", "good neighbors"], def: "Growing certain plants near each other for mutual benefit — pest control, pollination, or better use of space — while keeping incompatible pairs apart. The Bed Planner flags good and bad neighbors." },
+    { term: "Mulch", see: ["mulching", "straw"], def: "A protective layer (often straw) spread over the soil to hold moisture, suppress weeds, and keep roots cool. Marking a plant as mulched in the app stretches its watering interval by about half." },
+    { term: "Perennial", see: ["perennial", "comes back"], def: "A plant that lives for several years, coming back each season — like asparagus or a fruit tree — as opposed to an annual that's replanted yearly." },
+    { term: "Establishing", see: ["establish", "not yet fruiting"], def: "The first year(s) after planting a perennial or tree, when it's building roots and structure and shouldn't be harvested yet. The app shows an 'establishing' status until the first productive season." },
+    { term: "Self-fertile (self-pollinating)", see: ["self fertile", "self pollinating"], def: "A fruit tree that can set a crop with just one tree, no second variety needed. Mount Royal plum is self-fertile. A nearby partner can still boost yields." },
+    { term: "Cross-pollination (pollinator partner)", see: ["cross pollination", "pollinator", "partner"], def: "When a fruit tree needs pollen from a different, compatible variety nearby to set fruit. Many apples need a partner. The app can cross-check your trees or let you note a compatible tree nearby." },
+    { term: "Bloom group (early / mid / late)", see: ["bloom group", "bloom time", "flowering"], def: "Roughly when a fruit tree flowers in spring. Two trees can only cross-pollinate if their bloom times overlap, so the app pairs varieties in the same or an adjacent group." },
+    { term: "Years to fruit", see: ["years to fruit", "bearing age"], def: "How many years a young fruit tree typically takes to start bearing. The app counts down from your planted date to the first expected crop." },
+    { term: "Rootstock / dwarf", see: ["rootstock", "dwarf", "semi-dwarf", "graft"], def: "Fruit trees are grafted onto a root system (rootstock) that controls the tree's final size. A 'dwarf' rootstock keeps a tree small (often 8–12 ft) and easier to pick and prune." },
+    { term: "Drip line", see: ["drip line", "canopy edge"], def: "The circle on the ground directly under the outer edge of a tree's canopy, where rain drips off. It's roughly where the feeder roots are, so it's the best place to water and fertilize a tree." },
+    { term: "Square-foot gardening", see: ["square foot", "sfg", "grid", "bed planner"], def: "A method of dividing a raised bed into a 1 ft grid and planting a set number of each crop per square. The Bed Planner uses this grid to lay out and space your plantings." },
+    { term: "Bolting", see: ["bolt", "going to seed"], def: "When a plant (often a cool-season crop like lettuce or spinach) shoots up a flower stalk and stops producing good leaves, usually triggered by heat. The app's heat warnings help you get ahead of it." },
+    { term: "Full sun / partial sun / shade", see: ["full sun", "partial sun", "shade", "light"], def: "How much direct sunlight a spot gets: full sun is ~6+ hours a day, partial sun is ~3–6, and shade is less. Matching a crop to the right light is key to good growth." },
+  ];
+
+  return { ZONE_FROST, PLANTS, COMPANIONS, GLOSSARY };
 })();

@@ -17,6 +17,7 @@
   <header class="app-header">
     <button id="settingsBtn" class="icon-btn" type="button" aria-label="Settings" title="Settings">⚙︎</button>
     <h1>🌱 Garden Planner</h1>
+    <button id="helpBtn" class="icon-btn" type="button" aria-label="Help &amp; glossary" title="Help &amp; glossary">❓</button>
   </header>
 
   <div id="backupBanner" class="backup-banner" hidden role="status">
@@ -148,6 +149,24 @@
       </div>
       <section class="settings-section">
         <section id="weatherPanel" class="weather-panel"></section>
+      </section>
+    </div>
+  </dialog>
+
+  <!-- Help & glossary dialog -->
+  <dialog id="helpDialog">
+    <div class="settings-body">
+      <div class="settings-head">
+        <h2>❓ Help &amp; glossary</h2>
+        <button type="button" id="helpCloseBtn" class="icon-btn dark" aria-label="Close help">✕</button>
+      </div>
+      <section class="settings-section">
+        <p class="glossary-intro">Plain-language definitions of the gardening terms used throughout the app.</p>
+        <label class="glossary-search-label">
+          <input type="search" id="glossarySearch" placeholder="🔍 Search terms (e.g. harden off, feeder, zone)…" autocomplete="off" />
+        </label>
+        <dl id="glossaryList" class="glossary-list"></dl>
+        <p id="glossaryEmpty" class="glossary-empty" hidden>No terms match your search.</p>
       </section>
     </div>
   </dialog>

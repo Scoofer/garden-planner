@@ -59,6 +59,41 @@ html, body {
   top: calc(env(safe-area-inset-top) + 0.9rem);
   right: 0.9rem;
 }
+#helpBtn {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 0.9rem);
+  left: 0.9rem;
+  font-size: 1.1rem;
+}
+
+/* Glossary / help dialog */
+.glossary-intro { margin: 0 0 0.6rem; font-size: 0.85rem; color: var(--muted); }
+.glossary-search-label { display: block; margin-bottom: 0.6rem; }
+#glossarySearch {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.95rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #cdd8c4;
+  border-radius: 10px;
+  background: #fbfdf7;
+  color: var(--text);
+}
+.glossary-list { margin: 0; }
+.glossary-list dt {
+  font-weight: 700;
+  color: var(--green-dark);
+  font-size: 0.92rem;
+  margin-top: 0.7rem;
+}
+.glossary-list dt:first-child { margin-top: 0; }
+.glossary-list dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text);
+}
+.glossary-empty { font-size: 0.85rem; color: var(--muted); font-style: italic; margin-top: 0.8rem; }
 
 main {
   max-width: 720px;

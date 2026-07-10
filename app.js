@@ -831,6 +831,46 @@
     if (e.target === settingsDialog) settingsDialog.close();
   });
 
+  // --- Help & glossary dialog ---
+  const helpDialog = document.getElementById("helpDialog");
+  const glossaryListEl = document.getElementById("glossaryList");
+  const glossarySearchEl = document.getElementById("glossarySearch");
+  const glossaryEmptyEl = document.getElementById("glossaryEmpty");
+
+  function glossaryHtml(filter) {
+    const q = (filter || "").trim().toLowerCase();
+    const items = (DATA.GLOSSARY || []).filter((g) => {
+      if (!q) return true;
+      const hay = (g.term + " " + g.def + " " + (g.see || []).join(" ")).toLowerCase();
+      return hay.includes(q);
+    });
+    const slice = items.slice().sort((a, b) => a.term.localeCompare(b.term));
+    return { count: items.length, html: slice.map((g) =>
+      `<dt>${escapeHtml(g.term)}</dt><dd>${escapeHtml(g.def)}</dd>`).join("") };
+  }
+
+  function renderGlossary(filter) {
+    if (!glossaryListEl) return;
+    const r = glossaryHtml(filter);
+    glossaryListEl.innerHTML = r.html;
+    if (glossaryEmptyEl) glossaryEmptyEl.hidden = r.count !== 0;
+  }
+
+  const helpBtn = document.getElementById("helpBtn");
+  if (helpBtn && helpDialog) {
+    helpBtn.addEventListener("click", () => {
+      if (glossarySearchEl) glossarySearchEl.value = "";
+      renderGlossary("");
+      helpDialog.showModal();
+    });
+    const helpClose = document.getElementById("helpCloseBtn");
+    if (helpClose) helpClose.addEventListener("click", () => helpDialog.close());
+    helpDialog.addEventListener("click", (e) => {
+      if (e.target === helpDialog) helpDialog.close();
+    });
+    if (glossarySearchEl) glossarySearchEl.addEventListener("input", () => renderGlossary(glossarySearchEl.value));
+  }
+
   // --- Backup: export / import ---
   // Backup schema is versioned and ADDITIVE: newer app versions add top-level
   // keys but never repurpose old ones, so an old backup still restores on a new
@@ -2739,7 +2779,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, buildBackupPayload, readBackup, exportBackup, fsSupported: () => fsSupported, escapeHtml, safeUrl, guideCardHtml, openBedDialog, bedCols, bedRows, treeInfoFor, isFruitTree, pollinationStatus, zoneFitFor, bloomCompatible, seasonName, cardHtml, getBeds: () => beds, getPlants: () => plants, setPlants: (v) => { plants = v; }, getCustomPlants: () => customPlants, setWeather: (w) => { weather = w; } };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, buildBackupPayload, readBackup, exportBackup, fsSupported: () => fsSupported, escapeHtml, safeUrl, guideCardHtml, openBedDialog, bedCols, bedRows, treeInfoFor, isFruitTree, pollinationStatus, zoneFitFor, bloomCompatible, seasonName, cardHtml, glossaryHtml, getBeds: () => beds, getPlants: () => plants, setPlants: (v) => { plants = v; }, getCustomPlants: () => customPlants, setWeather: (w) => { weather = w; } };
   }
 
   render();
