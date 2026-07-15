@@ -478,23 +478,37 @@
     }
     if (!heatPlants.length && !humidPlants.length) { el.hidden = true; el.innerHTML = ""; return; }
 
-    const names = (arr) => arr.map((p) => escapeHtml(trackedDisplayName(p))).join(", ");
+    // Compact summary for the banner: collapse affected plants to their crop
+    // types with counts (e.g. "Tomato ×6, Cucumber ×2") so large gardens don't
+    // produce a wall of names. Each individual plant card still carries its own
+    // 🔥/🍄 badge for spotting the exact plants.
+    const typeSummary = (arr) => {
+      const counts = new Map();
+      for (const p of arr) {
+        const key = plantCrop(p) || p.name || "Plant";
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      return [...counts.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([type, n]) => `${escapeHtml(type)}${n > 1 ? ` ×${n}` : ""}`)
+        .join(", ");
+    };
     const blocks = [];
     if (heatPlants.length) {
       const feels = fp.peakFeels != null && fp.peakFeels >= fp.peakF + 3 ? ` (feels ${Math.round(fp.peakFeels)}°)` : "";
       blocks.push(`
         <div class="climate-block heat">
           <strong>🔥 Heat advisory — up to ${Math.round(fp.peakF)}°F${feels} ${escapeHtml(dayLabel(fp.hotDay))}</strong>
-          <p>${heatPlants.length} plant${heatPlants.length > 1 ? "s" : ""} may be stressed: <span class="climate-names">${names(heatPlants)}</span></p>
-          <p class="muted">Water deeply in the early morning, mulch to hold moisture, and shade the most sensitive crops through the hottest afternoons.</p>
+          <p>${heatPlants.length} plant${heatPlants.length > 1 ? "s" : ""} may be stressed: <span class="climate-names">${typeSummary(heatPlants)}</span></p>
+          <p class="muted">Look for the 🔥 badge on each plant below. Water deeply in the early morning, mulch to hold moisture, and shade the most sensitive crops through the hottest afternoons.</p>
         </div>`);
     }
     if (humidPlants.length) {
       blocks.push(`
         <div class="climate-block humid">
           <strong>🍄 Humid — disease watch (~${Math.round(fp.humidRh)}% humidity ${escapeHtml(dayLabel(fp.humidDay))})</strong>
-          <p>${humidPlants.length} plant${humidPlants.length > 1 ? "s" : ""} prone to fungal disease: <span class="climate-names">${names(humidPlants)}</span></p>
-          <p class="muted">Water at the base (not the leaves), improve airflow and spacing, and avoid handling plants while wet.</p>
+          <p>${humidPlants.length} plant${humidPlants.length > 1 ? "s" : ""} prone to fungal disease: <span class="climate-names">${typeSummary(humidPlants)}</span></p>
+          <p class="muted">Look for the 🍄 badge on each plant below. Water at the base (not the leaves), improve airflow and spacing, and avoid handling plants while wet.</p>
         </div>`);
     }
     el.innerHTML = blocks.join("");
@@ -2818,7 +2832,7 @@
   });
 
   if (typeof window !== "undefined" && window.__GARDEN_TEST__) {
-    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, buildBackupPayload, readBackup, exportBackup, fsSupported: () => fsSupported, escapeHtml, safeUrl, guideCardHtml, openBedDialog, bedCols, bedRows, treeInfoFor, isFruitTree, pollinationStatus, zoneFitFor, bloomCompatible, seasonName, cardHtml, glossaryHtml, getBeds: () => beds, getPlants: () => plants, setPlants: (v) => { plants = v; }, getCustomPlants: () => customPlants, setWeather: (w) => { weather = w; } };
+    window.__gardenTest = { seedTimeline, seedPlan, seedAction, hasIndoorStart, guidePlants, seasonWindow, seasonHarvestFor, seasonHarvest, effectiveInterval, daysUntilWater, climateOf, forecastPeak, climateAlertFor, renderClimateAlert, successionPlanFor, seedlingTiming, seedlingStatus, groupKeyOf, varietyLabel, canSeedStartNow, buildBackupPayload, readBackup, exportBackup, fsSupported: () => fsSupported, escapeHtml, safeUrl, guideCardHtml, openBedDialog, bedCols, bedRows, treeInfoFor, isFruitTree, pollinationStatus, zoneFitFor, bloomCompatible, seasonName, cardHtml, glossaryHtml, getBeds: () => beds, getPlants: () => plants, setPlants: (v) => { plants = v; }, getCustomPlants: () => customPlants, setWeather: (w) => { weather = w; } };
   }
 
   render();
